@@ -1,164 +1,298 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 
-// ── Receipt Modal ─────────────────────────────────────────────────────────────
-function ReceiptModal({ bill, onClose }) {
-    const printRef = useRef();
-
-    const handlePrint = () => {
-        const content = printRef.current.innerHTML;
-        const win = window.open('', '_blank', 'width=800,height=900');
-        win.document.write(`
-            <html>
-            <head>
-                <title>Receipt ${bill.bill_number}</title>
-                <style>
+// ── Print Receipt Function ───────────────────────────────────────────────────
+function printReceipt(bill) {
+    const win = window.open('', '_blank', 'width=800,height=900');
+    
+    win.document.write(`
+        <html>
+        <head>
+            <title>Receipt ${bill.bill_number}</title>
+            <style>
+                @page {
+                    size: 90mm auto;
+                    margin: 12mm;
+                }
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                body { 
+                    font-family: 'Courier New', monospace; 
+                    margin: 0 auto; 
+                    padding: 15mm;
+                    max-width: 90mm;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    color: #000;
+                    background: #fff;
+                }
+                .logo-container {
+                    text-align: center;
+                    margin-bottom: 15px;
+                    padding-bottom: 10px;
+                    border-bottom: 2px solid #000;
+                }
+                .logo {
+                    max-width: 160px;
+                    height: auto;
+                    margin: 0 auto 8px;
+                    display: block;
+                }
+                .center { text-align: center; }
+                .divider { 
+                    border-top: 1px dashed #000; 
+                    margin: 12px 0; 
+                }
+                .section-divider {
+                    border-top: 2px solid #000;
+                    margin: 15px 0;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 12px 0;
+                }
+                td, th { 
+                    padding: 6px 4px; 
+                    text-align: left;
+                    color: #000;
+                }
+                th {
+                    border-bottom: 1px solid #000;
+                    font-weight: bold;
+                }
+                .right { text-align: right; }
+                .bold { font-weight: bold; }
+                .title { 
+                    font-size: 22px; 
+                    font-weight: bold; 
+                    color: #000;
+                    margin-bottom: 4px;
+                }
+                .subtitle { 
+                    font-size: 13px; 
+                    color: #000; 
+                    margin-bottom: 3px;
+                }
+                .bill-label {
+                    font-size: 13px;
+                    color: #000;
+                    font-weight: bold;
+                    margin-top: 10px;
+                }
+                .bill-number {
+                    font-size: 16px;
+                    font-weight: bold;
+                    color: #000;
+                    margin: 5px 0;
+                }
+                .bill-date {
+                    font-size: 13px;
+                    color: #000;
+                    margin-bottom: 8px;
+                }
+                .customer-box {
+                    border: 2px solid #000;
+                    padding: 10px;
+                    margin: 12px 0;
+                    background: #fff;
+                }
+                .customer-label {
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: #000;
+                    text-transform: uppercase;
+                    margin-bottom: 5px;
+                }
+                .customer-name {
+                    font-size: 14px;
+                    font-weight: bold;
+                    color: #000;
+                    margin-bottom: 3px;
+                }
+                .customer-phone {
+                    font-size: 13px;
+                    color: #000;
+                }
+                .item-row {
+                    border-bottom: 1px solid #ccc;
+                }
+                .item-name {
+                    font-weight: 600;
+                    color: #000;
+                    font-size: 13px;
+                }
+                .item-detail {
+                    color: #000;
+                    font-size: 13px;
+                }
+                .total-section {
+                    border-top: 2px solid #000;
+                    margin-top: 15px;
+                    padding-top: 12px;
+                }
+                .total-label {
+                    font-weight: bold;
+                    font-size: 16px;
+                    text-transform: uppercase;
+                    color: #000;
+                }
+                .total-amount {
+                    font-weight: bold;
+                    font-size: 20px;
+                    color: #000;
+                    text-align: right;
+                }
+                .payment-section {
+                    margin-top: 12px;
+                    padding: 10px;
+                    border: 1px solid #000;
+                    background: #f9f9f9;
+                }
+                .payment-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 5px 0;
+                    font-size: 13px;
+                    color: #000;
+                }
+                .balance-row {
+                    border-top: 1px solid #000;
+                    padding-top: 8px;
+                    margin-top: 8px;
+                }
+                .balance-label {
+                    font-weight: bold;
+                    font-size: 15px;
+                    color: #000;
+                }
+                .balance-amount {
+                    font-weight: bold;
+                    font-size: 15px;
+                    color: #000;
+                }
+                .footer {
+                    margin-top: 20px;
+                    padding-top: 12px;
+                    border-top: 1px dashed #000;
+                    text-align: center;
+                }
+                .footer-text {
+                    font-size: 13px;
+                    color: #000;
+                    margin: 4px 0;
+                }
+                .footer-url {
+                    font-size: 12px;
+                    color: #000;
+                    margin-top: 6px;
+                }
+                @media print {
                     @page {
-                        size: auto;
-                        margin: 10mm;
+                        size: 90mm auto;
+                        margin: 12mm;
                     }
-                    * {
+                    body {
                         margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
+                        padding: 12mm;
                     }
-                    body { 
-                        font-family: 'Courier New', monospace; 
-                        margin: 0 auto; 
-                        padding: 20px;
-                        max-width: 80mm;
-                        font-size: 13px;
-                        line-height: 1.4;
-                    }
-                    .center { text-align: center; }
-                    .divider { border-top: 1px dashed #999; margin: 10px 0; }
-                    table { 
-                        width: 100%; 
-                        border-collapse: collapse; 
-                        margin: 10px 0;
-                    }
-                    td, th { 
-                        padding: 4px 2px; 
-                        text-align: left;
-                    }
-                    .right { text-align: right; }
-                    .bold { font-weight: bold; }
-                    .title { font-size: 20px; font-weight: bold; }
-                    .sub { font-size: 11px; color: #555; }
-                    .total-row td { 
-                        font-weight: bold; 
-                        font-size: 15px; 
-                        border-top: 2px solid #333; 
-                        padding-top: 8px;
-                    }
-                    @media print {
-                        body {
-                            margin: 0;
-                            padding: 15px;
-                        }
-                    }
-                </style>
-            </head>
-            <body>${content}</body>
-            </html>
-        `);
-        win.document.close();
-        win.focus();
-        win.onafterprint = () => win.close();
-        setTimeout(() => win.print(), 300);
-    };
+                }
+            </style>
+        </head>
+        <body>
+            <!-- Logo and Header -->
+            <div class="logo-container">
+                <img src="/images/logo.jpeg" alt="PlayArea Logo" class="logo" />
+                <p class="title">PLAYAREA</p>
+                <p class="subtitle">Games Platform</p>
+            </div>
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-                    <h2 className="text-lg font-bold text-gray-800">Receipt</h2>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handlePrint}
-                            className="flex items-center gap-1.5 bg-gray-900 hover:bg-gray-700 text-white rounded-lg px-4 py-2 text-sm font-semibold transition"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                            </svg>
-                            Print
-                        </button>
-                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8">&times;</button>
-                    </div>
-                </div>
-                <div className="overflow-y-auto p-6">
-                    <div ref={printRef} className="font-mono text-sm">
-                        <div className="text-center mb-4">
-                            <p className="text-xl font-extrabold tracking-widest">PLAYAREA</p>
-                            <p className="text-xs text-gray-500 tracking-wide">Games Platform</p>
-                            <div className="border-t border-dashed border-gray-300 my-3" />
-                            <p className="text-xs text-gray-500">BILL RECEIPT</p>
-                            <p className="font-bold text-base mt-1">{bill.bill_number}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">{new Date(bill.created_at).toLocaleString()}</p>
-                        </div>
-                        {bill.customer && (
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 mb-3">
-                                <p className="text-xs text-gray-500 font-semibold">Customer</p>
-                                <p className="text-sm font-bold text-gray-800">{bill.customer.name}</p>
-                                <p className="text-xs text-gray-600">{bill.customer.phone}</p>
-                            </div>
-                        )}
-                        <div className="border-t border-dashed border-gray-300 my-3" />
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr className="text-gray-500">
-                                    <th className="text-left py-1 font-semibold">Item</th>
-                                    <th className="text-center py-1 font-semibold">Qty</th>
-                                    <th className="text-right py-1 font-semibold">Price</th>
-                                    <th className="text-right py-1 font-semibold">Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {bill.items.map((item, i) => (
-                                    <tr key={i} className="border-t border-gray-100">
-                                        <td className="py-1.5 font-medium text-gray-800 pr-2">🪙 {item.coin_name}</td>
-                                        <td className="text-center py-1.5 text-gray-600">×{item.quantity}</td>
-                                        <td className="text-right py-1.5 text-gray-600">LKR {parseFloat(item.coin_price).toFixed(2)}</td>
-                                        <td className="text-right py-1.5 font-semibold text-gray-800">LKR {parseFloat(item.subtotal).toFixed(2)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        <div className="border-t-2 border-gray-800 mt-3 pt-3 flex justify-between items-center">
-                            <span className="font-extrabold text-gray-800 text-sm tracking-wide uppercase">TOTAL</span>
-                            <span className="font-extrabold text-xl text-gray-900">LKR {parseFloat(bill.total).toFixed(2)}</span>
-                        </div>
-                        {bill.payment_method && (
-                            <div className="mt-3 space-y-1">
-                                <div className="flex justify-between items-center text-xs text-gray-500">
-                                    <span>Payment Method</span>
-                                    <span className="font-semibold">{bill.payment_method === 'card' ? '💳 Card' : '💵 Cash'}</span>
-                                </div>
-                                {bill.payment_method === 'cash' && bill.cash_amount && (
-                                    <>
-                                        <div className="flex justify-between items-center text-xs">
-                                            <span className="text-gray-600">Cash Given</span>
-                                            <span className="font-semibold text-gray-800">LKR {parseFloat(bill.cash_amount).toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm border-t border-gray-200 pt-1">
-                                            <span className="font-bold text-green-700">Balance</span>
-                                            <span className="font-extrabold text-green-700">LKR {(parseFloat(bill.cash_amount) - parseFloat(bill.total)).toFixed(2)}</span>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                        <div className="border-t border-dashed border-gray-300 my-4" />
-                        <p className="text-center text-xs text-gray-400">Thank you for your purchase!</p>
-                        <p className="text-center text-xs text-gray-300 mt-1">www.playarea.com</p>
-                    </div>
+            <!-- Bill Details -->
+            <div class="center">
+                <p class="bill-label">BILL RECEIPT</p>
+                <p class="bill-number">${bill.bill_number}</p>
+                <p class="bill-date">${new Date(bill.created_at).toLocaleString()}</p>
+            </div>
+
+            ${bill.customer ? `
+            <!-- Customer Information -->
+            <div class="customer-box">
+                <p class="customer-label">Customer Details</p>
+                <p class="customer-name">${bill.customer.name}</p>
+                <p class="customer-phone">Tel: ${bill.customer.phone}</p>
+            </div>
+            ` : ''}
+
+            <div class="divider"></div>
+
+            <!-- Items Table -->
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">Item</th>
+                        <th style="text-align: center;">Qty</th>
+                        <th style="text-align: right;">Price</th>
+                        <th style="text-align: right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${bill.items.map(item => `
+                        <tr class="item-row">
+                            <td class="item-name">${item.coin_name}</td>
+                            <td class="item-detail" style="text-align: center;">x${item.quantity}</td>
+                            <td class="item-detail" style="text-align: right;">LKR ${parseFloat(item.coin_price).toFixed(2)}</td>
+                            <td class="item-detail" style="text-align: right; font-weight: bold;">LKR ${parseFloat(item.subtotal).toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+
+            <!-- Total Section -->
+            <div class="total-section">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="total-label">Grand Total</span>
+                    <span class="total-amount">LKR ${parseFloat(bill.total).toFixed(2)}</span>
                 </div>
             </div>
-        </div>
-    );
+
+            ${bill.payment_method ? `
+            <!-- Payment Details -->
+            <div class="payment-section">
+                <div class="payment-row">
+                    <span style="font-weight: bold;">Payment Method:</span>
+                    <span>${bill.payment_method === 'card' ? 'Card' : 'Cash'}</span>
+                </div>
+                ${bill.payment_method === 'cash' && bill.cash_amount ? `
+                    <div class="payment-row">
+                        <span>Cash Given:</span>
+                        <span style="font-weight: bold;">LKR ${parseFloat(bill.cash_amount).toFixed(2)}</span>
+                    </div>
+                    <div class="payment-row balance-row">
+                        <span class="balance-label">Balance:</span>
+                        <span class="balance-amount">LKR ${(parseFloat(bill.cash_amount) - parseFloat(bill.total)).toFixed(2)}</span>
+                    </div>
+                ` : ''}
+            </div>
+            ` : ''}
+
+            <!-- Footer -->
+            <div class="footer">
+                <p class="footer-text">Thank you for your purchase!</p>
+                <p class="footer-url">www.playarea.com</p>
+            </div>
+        </body>
+        </html>
+    `);
+    
+    win.document.close();
+    win.focus();
+    win.onafterprint = () => win.close();
+    setTimeout(() => win.print(), 300);
 }
 
 // ── Billing Page ───────────────────────────────────────────────────────────────
@@ -172,7 +306,6 @@ export default function Billing() {
     const [loading,    setLoading]    = useState(false);
     const [pageLoad,   setPageLoad]   = useState(true);
     const [error,      setError]      = useState(null);
-    const [receipt,    setReceipt]    = useState(null);
     
     // Customer states
     const [customerSearch, setCustomerSearch] = useState('');
@@ -300,7 +433,7 @@ export default function Billing() {
                 setSelections({}); 
                 setCashAmount(''); 
                 setSelectedCustomer(null);
-                setReceipt(data); 
+                printReceipt(data);
             }
         } catch (_) { setError('Network error. Please try again.'); }
         finally { setLoading(false); }
@@ -687,10 +820,8 @@ export default function Billing() {
                             </button>
                         </div>
                     </div>
-                )}
+)}
             </main>
-
-            {receipt && <ReceiptModal bill={receipt} onClose={() => setReceipt(null)} />}
         </div>
     );
 }

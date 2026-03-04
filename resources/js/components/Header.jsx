@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Header() {
+    const navigate = useNavigate();
     const { user, logout } = useAuth();
     const [open, setOpen] = useState(false);
 
@@ -15,20 +17,23 @@ export default function Header() {
     return (
         <header className="flex items-center justify-between bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
 
-            {/* Left — Logo */}
-            <div className="flex items-center gap-4">
+            {/* Left — Logo (Clickable to Home) */}
+            <button 
+                onClick={() => navigate('/')}
+                className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+            >
                 <img
-                    src="/images/jaan_logo.jpg"
-                    alt="JAAN Network"
-                    className="h-12 w-auto object-contain"
+                    src="/images/logo.jpeg"
+                    alt="PlayArea Logo"
+                    className="h-12 w-auto object-contain rounded-lg"
                 />
 
                 {/* Title */}
-                <div className="hidden sm:block">
+                <div className="hidden sm:block text-left">
                     <p className="text-sm font-bold text-gray-800 leading-tight">PlayArea</p>
                     <p className="text-xs text-gray-500 leading-tight">Games Platform</p>
                 </div>
-            </div>
+            </button>
 
             {/* Right — User */}
             <div className="relative">
