@@ -9,5 +9,10 @@ class Game extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'coin_price'];
+    protected $fillable = ['name', 'coin_id'];
+
+    public function coin()
+    {
+        return $this->belongsTo(Coin::class);
+    }
 }

@@ -220,11 +220,20 @@ export default function Coins() {
     const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
+        if (!token) return;
+        
         fetch('/api/coins', {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         })
-            .then(r => r.json())
-            .then(data => setCoins(data))
+            .then(r => {
+                if (!r.ok) throw new Error('Failed to fetch coins');
+                return r.json();
+            })
+            .then(data => setCoins(Array.isArray(data) ? data : []))
+            .catch(err => {
+                console.error('Error loading coins:', err);
+                setCoins([]);
+            })
             .finally(() => setLoading(false));
     }, [token]);
 

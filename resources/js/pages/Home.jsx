@@ -53,14 +53,7 @@ const IconCoin = () => (
 
 // ── Dashboard cards config ─────────────────────────────────────────────────────
 const cards = [
-    {
-        key:   'games',
-        title: 'GAMES',
-        desc:  'Browse car, bike and teddy bear games. Track player sessions and manage game listings.',
-        Icon:  IconGamepad,
-        bg:    '#e53935',   // red
-        path:  '/games',
-    },
+  
     {
         key:   'billing',
         title: 'BILLING',
@@ -68,6 +61,23 @@ const cards = [
         Icon:  IconBilling,
         bg:    '#1a237e',   // dark navy
         path:  '/billing',
+    },
+    
+    {
+        key:   'coins',
+        title: 'COINS',
+        desc:  'Create and manage coin packages with custom names and prices.',
+        Icon:  IconCoin,
+        bg:    '#6a1b9a',   // purple
+        path:  '/coins',
+    },
+      {
+        key:   'games',
+        title: 'GAMES',
+        desc:  'Browse car, bike and teddy bear games. Track player sessions and manage game listings.',
+        Icon:  IconGamepad,
+        bg:    '#e53935',   // red
+        path:  '/games',
     },
     {
         key:   'customer',
@@ -84,14 +94,6 @@ const cards = [
         Icon:  IconReport,
         bg:    '#2e7d32',   // green
         path:  '/reports',
-    },
-    {
-        key:   'coins',
-        title: 'COINS',
-        desc:  'Create and manage coin packages with custom names and prices.',
-        Icon:  IconCoin,
-        bg:    '#6a1b9a',   // purple
-        path:  '/coins',
     },
 ];
 

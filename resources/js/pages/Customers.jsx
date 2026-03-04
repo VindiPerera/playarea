@@ -21,7 +21,7 @@ function gameEmoji(name) {
 
 // ── Add Customer Modal ────────────────────────────────────────────────────────
 function AddCustomerModal({ token, games, onClose, onSaved }) {
-    const [form,    setForm]    = useState({ name: '', phone: '', game: '' });
+    const [form,    setForm]    = useState({ name: '', phone: '' });
     const [errors,  setErrors]  = useState({});
     const [loading, setLoading] = useState(false);
 
@@ -110,28 +110,6 @@ function AddCustomerModal({ token, games, onClose, onSaved }) {
                             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                         />
                         {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone[0]}</p>}
-                    </div>
-
-                    {/* Game */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Game <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                            name="game"
-                            value={form.game}
-                            onChange={handleChange}
-                            required
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition bg-white"
-                        >
-                            <option value="" disabled>Select a game…</option>
-                            {games.map(g => (
-                                <option key={g.id} value={g.name}>
-                                    {gameEmoji(g.name)} {g.name}
-                                </option>
-                            ))}
-                        </select>
-                        {errors.game && <p className="mt-1 text-xs text-red-500">{errors.game[0]}</p>}
                     </div>
 
                     <div className="flex gap-3 pt-2">
@@ -225,13 +203,25 @@ export default function Customers() {
     const [showModal, setShowModal]     = useState(false);
 
     useEffect(() => {
+        if (!token) return;
+        
         const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
         Promise.all([
-            fetch('/api/customers', { headers }).then(r => r.json()),
-            fetch('/api/games',     { headers }).then(r => r.json()),
+            fetch('/api/customers', { headers }).then(r => {
+                if (!r.ok) throw new Error('Failed to fetch customers');
+                return r.json();
+            }),
+            fetch('/api/games', { headers }).then(r => {
+                if (!r.ok) throw new Error('Failed to fetch games');
+                return r.json();
+            }),
         ]).then(([cData, gData]) => {
-            setCustomers(cData);
-            setGames(gData);
+            setCustomers(Array.isArray(cData) ? cData : []);
+            setGames(Array.isArray(gData) ? gData : []);
+        }).catch(err => {
+            console.error('Error loading data:', err);
+            setCustomers([]);
+            setGames([]);
         }).finally(() => setLoading(false));
     }, [token]);
 

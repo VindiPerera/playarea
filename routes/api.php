@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Games
     Route::get('/games',            [GameController::class, 'index']);
     Route::post('/games',           [GameController::class, 'store']);
+    Route::put('/games/{game}',     [GameController::class, 'update']);
     Route::delete('/games/{game}',  [GameController::class, 'destroy']);
 
     // Coins
@@ -42,4 +43,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/today',             [ReportController::class, 'today']);
     Route::get('/reports/summary',           [ReportController::class, 'summary']);
     Route::post('/reports/save-coin-count',  [ReportController::class, 'saveCoinCount']);
+    Route::get('/reports/export-pdf',        [ReportController::class, 'exportPdf']);
 });

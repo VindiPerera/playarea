@@ -101,6 +101,37 @@ export default function Reports() {
         }
     };
 
+    const resetFilters = () => {
+        const today = new Date();
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        
+        setEndDate(today.toISOString().split('T')[0]);
+        setStartDate(weekAgo.toISOString().split('T')[0]);
+    };
+
+    const exportPdf = async () => {
+        try {
+            const response = await axios.get('/api/reports/export-pdf', {
+                params: { start_date: startDate, end_date: endDate },
+                responseType: 'blob'
+            });
+            
+            // Create a blob URL and trigger download
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `sales-report-${startDate}-to-${endDate}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error exporting PDF:', error);
+            alert('Error generating PDF report');
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             <Header />
@@ -147,7 +178,7 @@ export default function Reports() {
                 {/* Date Range Filter (for Summary and History) */}
                 {(activeTab === 'summary' || activeTab === 'history') && (
                     <div className="mb-6 bg-white p-4 rounded-lg shadow">
-                        <div className="flex gap-4 items-center">
+                        <div className="flex gap-4 items-end">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Start Date
@@ -170,6 +201,21 @@ export default function Reports() {
                                     className="border rounded px-3 py-2"
                                 />
                             </div>
+                            <button
+                                onClick={resetFilters}
+                                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
+                            >
+                                Reset
+                            </button>
+                            <button
+                                onClick={exportPdf}
+                                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Export PDF
+                            </button>
                         </div>
                     </div>
                 )}
@@ -209,7 +255,8 @@ export default function Reports() {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {todayReports.map((report) => {
                                     const coinCount = editingCounts[report.game_id] || 0;
-                                    const revenue = (coinCount * parseFloat(report.coin_price || report.game?.coin_price || 0)).toFixed(2);
+                                    const coinPrice = parseFloat(report.coin_price || report.game?.coin?.price || 0);
+                                    const revenue = (coinCount * coinPrice).toFixed(2);
                                     
                                     return (
                                         <tr key={report.game_id}>
@@ -217,7 +264,7 @@ export default function Reports() {
                                                 {report.game?.name || report.game_name}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                LKR {parseFloat(report.coin_price || report.game?.coin_price || 0).toFixed(2)}
+                                                LKR {coinPrice.toFixed(2)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <input

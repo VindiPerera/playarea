@@ -3,11 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 
-// ── Add Game Modal ────────────────────────────────────────────────────────────
-function AddGameModal({ token, onClose, onSaved }) {
-    const [form,    setForm]    = useState({ name: '', coin_price: '' });
+// ── Add/Edit Game Modal ───────────────────────────────────────────────────────
+function GameModal({ token, onClose, onSaved, editGame = null }) {
+    const isEditing = !!editGame;
+    const [form,    setForm]    = useState({ 
+        name: editGame?.name || '', 
+        coin_id: editGame?.coin_id || '' 
+    });
     const [errors,  setErrors]  = useState({});
     const [loading, setLoading] = useState(false);
+    const [coins,   setCoins]   = useState([]);
+
+    useEffect(() => {
+        if (!token) return;
+        
+        // Fetch coins for dropdown
+        fetch('/api/coins', { 
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } 
+        })
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch coins');
+                return res.json();
+            })
+            .then(data => setCoins(Array.isArray(data) ? data : []))
+            .catch((err) => {
+                console.error('Error loading coins:', err);
+                setCoins([]);
+            });
+    }, [token]);
 
     const handleChange = (e) =>
         setForm(p => ({ ...p, [e.target.name]: e.target.value }));
@@ -17,8 +40,11 @@ function AddGameModal({ token, onClose, onSaved }) {
         setErrors({});
         setLoading(true);
         try {
-            const res  = await fetch('/api/games', {
-                method:  'POST',
+            const url = isEditing ? `/api/games/${editGame.id}` : '/api/games';
+            const method = isEditing ? 'PUT' : 'POST';
+            
+            const res  = await fetch(url, {
+                method:  method,
                 headers: {
                     'Content-Type': 'application/json',
                     Accept:         'application/json',
@@ -30,7 +56,7 @@ function AddGameModal({ token, onClose, onSaved }) {
             if (!res.ok) {
                 setErrors(data.errors ?? { general: [data.message ?? 'Error'] });
             } else {
-                onSaved(data);
+                onSaved(data, isEditing);
                 onClose();
             }
         } catch (_) {
@@ -48,7 +74,9 @@ function AddGameModal({ token, onClose, onSaved }) {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-bold text-gray-800">Add Game</h2>
+                    <h2 className="text-lg font-bold text-gray-800">
+                        {isEditing ? 'Edit Game' : 'Add Game'}
+                    </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
@@ -80,28 +108,26 @@ function AddGameModal({ token, onClose, onSaved }) {
                         {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name[0]}</p>}
                     </div>
 
-                    {/* Coin Price */}
+                    {/* Coin Selection */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Game Coin Price (LKR) <span className="text-red-500">*</span>
+                            Select Coin Type <span className="text-red-500">*</span>
                         </label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">
-                                LKR
-                            </span>
-                            <input
-                                name="coin_price"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={form.coin_price}
-                                onChange={handleChange}
-                                required
-                                placeholder="e.g. 10.00"
-                                className="w-full border border-gray-300 rounded-lg pl-14 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                            />
-                        </div>
-                        {errors.coin_price && <p className="mt-1 text-xs text-red-500">{errors.coin_price[0]}</p>}
+                        <select
+                            name="coin_id"
+                            value={form.coin_id}
+                            onChange={handleChange}
+                            required
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition bg-white"
+                        >
+                            <option value="">-- Select a coin --</option>
+                            {coins.map(coin => (
+                                <option key={coin.id} value={coin.id}>
+                                    {coin.name} - LKR {parseFloat(coin.price).toFixed(2)}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.coin_id && <p className="mt-1 text-xs text-red-500">{errors.coin_id[0]}</p>}
                     </div>
 
                     <div className="flex gap-3 pt-2">
@@ -117,7 +143,7 @@ function AddGameModal({ token, onClose, onSaved }) {
                             disabled={loading}
                             className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg py-2.5 text-sm font-semibold transition"
                         >
-                            {loading ? 'Saving…' : 'Add Game'}
+                            {loading ? 'Saving…' : (isEditing ? 'Update Game' : 'Add Game')}
                         </button>
                     </div>
                 </form>
@@ -139,7 +165,7 @@ function getStyle(name) {
     return GAME_STYLE.default;
 }
 
-function GameCard({ game, token, onDeleted }) {
+function GameCard({ game, token, onDeleted, onEdit }) {
     const { bg, emoji } = getStyle(game.name);
     const [confirming, setConfirming] = useState(false);
 
@@ -167,9 +193,15 @@ function GameCard({ game, token, onDeleted }) {
                 {/* Details */}
                 <div className="space-y-2 text-sm mt-3">
                     <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Coin Type:</span>
+                        <span className="font-semibold text-gray-800">
+                            {game.coin?.name || 'N/A'}
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between">
                         <span className="text-gray-500">Coin Price:</span>
                         <span className="font-semibold text-gray-800">
-                            LKR {parseFloat(game.coin_price).toFixed(2)}
+                            LKR {game.coin ? parseFloat(game.coin.price).toFixed(2) : '0.00'}
                         </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -182,37 +214,46 @@ function GameCard({ game, token, onDeleted }) {
             </div>
 
             {/* Footer */}
-            <div className="bg-gray-900 flex items-center justify-center py-3 gap-4">
+            <div className="bg-gray-900 flex items-center justify-center py-3 gap-3">
                 {confirming ? (
                     <>
-                        <span className="text-xs text-gray-300">Delete?</span>
+                        <span className="text-xs text-gray-300">Delete this game?</span>
                         <button
                             onClick={handleDelete}
-                            className="text-red-400 hover:text-red-300 text-xs font-semibold transition"
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-semibold transition"
                         >
                             Yes
                         </button>
                         <button
                             onClick={() => setConfirming(false)}
-                            className="text-gray-400 hover:text-white text-xs transition"
+                            className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs transition"
                         >
                             No
                         </button>
                     </>
                 ) : (
-                    <button
-                        onClick={() => setConfirming(true)}
-                        className="text-gray-400 hover:text-white transition"
-                        title="Delete game"
-                    >
-                        {/* Eye icon */}
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                    </button>
+                    <>
+                        <button
+                            onClick={() => onEdit(game)}
+                            className="text-blue-400 hover:text-blue-300 transition"
+                            title="Edit game"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={() => setConfirming(true)}
+                            className="text-red-400 hover:text-red-300 transition"
+                            title="Delete game"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </>
                 )}
             </div>
         </div>
@@ -227,18 +268,42 @@ export default function Games() {
     const [loading,   setLoading]     = useState(true);
     const [search,    setSearch]      = useState('');
     const [showModal, setShowModal]   = useState(false);
+    const [editingGame, setEditingGame] = useState(null);
 
     useEffect(() => {
+        if (!token) return;
+        
         fetch('/api/games', {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         })
-            .then(r => r.json())
-            .then(data => setGames(data))
+            .then(r => {
+                if (!r.ok) throw new Error('Failed to fetch games');
+                return r.json();
+            })
+            .then(data => setGames(Array.isArray(data) ? data : []))
+            .catch(err => {
+                console.error('Error loading games:', err);
+                setGames([]);
+            })
             .finally(() => setLoading(false));
     }, [token]);
 
-    const handleSaved   = (game) => setGames(prev => [game, ...prev]);
+    const handleSaved   = (game, isEditing) => {
+        if (isEditing) {
+            setGames(prev => prev.map(g => g.id === game.id ? game : g));
+        } else {
+            setGames(prev => [game, ...prev]);
+        }
+    };
     const handleDeleted = (id)   => setGames(prev => prev.filter(g => g.id !== id));
+    const handleEdit = (game) => {
+        setEditingGame(game);
+        setShowModal(true);
+    };
+    const handleCloseModal = () => {
+        setShowModal(false);
+        setEditingGame(null);
+    };
 
     const filtered = games.filter(g =>
         g.name.toLowerCase().includes(search.toLowerCase())
@@ -313,6 +378,7 @@ export default function Games() {
                                 game={g}
                                 token={token}
                                 onDeleted={handleDeleted}
+                                onEdit={handleEdit}
                             />
                         ))}
                     </div>
@@ -320,10 +386,11 @@ export default function Games() {
             </main>
 
             {showModal && (
-                <AddGameModal
+                <GameModal
                     token={token}
-                    onClose={() => setShowModal(false)}
+                    onClose={handleCloseModal}
                     onSaved={handleSaved}
+                    editGame={editingGame}
                 />
             )}
         </div>

@@ -7,6 +7,7 @@ use App\Models\DailySalesReport;
 use App\Models\Game;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
 {
@@ -15,7 +16,7 @@ class ReportController extends Controller
      */
     public function index(Request $request)
     {
-        $query = DailySalesReport::with('game');
+        $query = DailySalesReport::with('game.coin');
 
         // Filter by date range if provided
         if ($request->has('start_date')) {
@@ -43,7 +44,7 @@ class ReportController extends Controller
     public function today()
     {
         $today = Carbon::now()->format('Y-m-d');
-        $games = Game::all();
+        $games = Game::with('coin')->get();
         
         $reports = [];
         foreach ($games as $game) {
@@ -58,7 +59,7 @@ class ReportController extends Controller
                     'game' => $game,
                     'report_date' => $today,
                     'coin_count' => 0,
-                    'coin_price' => $game->coin_price,
+                    'coin_price' => $game->coin ? $game->coin->price : 0,
                     'total_revenue' => 0
                 ];
             } else {
@@ -82,11 +83,14 @@ class ReportController extends Controller
             'coin_count' => 'required|integer|min:0'
         ]);
 
-        // Get game to fetch current coin price
-        $game = Game::findOrFail($validated['game_id']);
+        // Get game with coin to fetch current coin price
+        $game = Game::with('coin')->findOrFail($validated['game_id']);
+        
+        // Get coin price from the game's coin
+        $coinPrice = $game->coin ? $game->coin->price : 0;
         
         // Calculate total revenue
-        $totalRevenue = $validated['coin_count'] * $game->coin_price;
+        $totalRevenue = $validated['coin_count'] * $coinPrice;
 
         // Update or create the daily sales report
         $report = DailySalesReport::updateOrCreate(
@@ -96,12 +100,12 @@ class ReportController extends Controller
             ],
             [
                 'coin_count' => $validated['coin_count'],
-                'coin_price' => $game->coin_price,
+                'coin_price' => $coinPrice,
                 'total_revenue' => $totalRevenue
             ]
         );
 
-        $report->load('game');
+        $report->load('game.coin');
 
         return response()->json([
             'message' => 'Coin count saved successfully',
@@ -126,7 +130,7 @@ class ReportController extends Controller
             ->first();
 
         // Summary by game
-        $byGame = DailySalesReport::with('game')
+        $byGame = DailySalesReport::with('game.coin')
             ->whereBetween('report_date', [$startDate, $endDate])
             ->select(
                 'game_id',
@@ -158,5 +162,58 @@ class ReportController extends Controller
                 'end_date' => $endDate
             ]
         ]);
+    }
+
+    /**
+     * Export sales report as PDF
+     */
+    public function exportPdf(Request $request)
+    {
+        $startDate = $request->start_date ?? Carbon::now()->subDays(30)->format('Y-m-d');
+        $endDate = $request->end_date ?? Carbon::now()->format('Y-m-d');
+
+        // Overall summary
+        $overall = DailySalesReport::whereBetween('report_date', [$startDate, $endDate])
+            ->select(
+                DB::raw('SUM(coin_count) as total_coins'),
+                DB::raw('SUM(total_revenue) as total_revenue')
+            )
+            ->first();
+
+        // Summary by game
+        $byGame = DailySalesReport::with('game.coin')
+            ->whereBetween('report_date', [$startDate, $endDate])
+            ->select(
+                'game_id',
+                DB::raw('SUM(coin_count) as total_coins'),
+                DB::raw('SUM(total_revenue) as total_revenue'),
+                DB::raw('AVG(coin_count) as avg_coins_per_day'),
+                DB::raw('COUNT(*) as days_tracked')
+            )
+            ->groupBy('game_id')
+            ->get();
+
+        // Daily totals
+        $dailyTotals = DailySalesReport::whereBetween('report_date', [$startDate, $endDate])
+            ->select(
+                'report_date',
+                DB::raw('SUM(coin_count) as total_coins'),
+                DB::raw('SUM(total_revenue) as total_revenue')
+            )
+            ->groupBy('report_date')
+            ->orderBy('report_date', 'asc')
+            ->get();
+
+        $data = [
+            'overall' => $overall,
+            'by_game' => $byGame,
+            'daily_totals' => $dailyTotals,
+            'start_date' => $startDate,
+            'end_date' => $endDate
+        ];
+
+        $pdf = Pdf::loadView('reports.pdf', $data);
+        
+        return $pdf->download('sales-report-' . $startDate . '-to-' . $endDate . '.pdf');
     }
 }

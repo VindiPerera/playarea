@@ -9,22 +9,60 @@ function ReceiptModal({ bill, onClose }) {
 
     const handlePrint = () => {
         const content = printRef.current.innerHTML;
-        const win = window.open('', '_blank', 'width=480,height=700');
+        const win = window.open('', '_blank', 'width=800,height=900');
         win.document.write(`
-            <html><head><title>Receipt ${bill.bill_number}</title>
-            <style>
-              body { font-family: 'Courier New', monospace; margin: 0; padding: 20px; font-size: 13px; }
-              .center { text-align: center; }
-              .divider { border-top: 1px dashed #999; margin: 10px 0; }
-              table { width: 100%; border-collapse: collapse; }
-              td, th { padding: 4px 2px; }
-              .right { text-align: right; }
-              .bold { font-weight: bold; }
-              .title { font-size: 20px; font-weight: bold; }
-              .sub { font-size: 11px; color: #555; }
-              .total-row td { font-weight: bold; font-size: 15px; border-top: 2px solid #333; }
-            </style></head>
-            <body>${content}</body></html>
+            <html>
+            <head>
+                <title>Receipt ${bill.bill_number}</title>
+                <style>
+                    @page {
+                        size: auto;
+                        margin: 10mm;
+                    }
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
+                    body { 
+                        font-family: 'Courier New', monospace; 
+                        margin: 0 auto; 
+                        padding: 20px;
+                        max-width: 80mm;
+                        font-size: 13px;
+                        line-height: 1.4;
+                    }
+                    .center { text-align: center; }
+                    .divider { border-top: 1px dashed #999; margin: 10px 0; }
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                        margin: 10px 0;
+                    }
+                    td, th { 
+                        padding: 4px 2px; 
+                        text-align: left;
+                    }
+                    .right { text-align: right; }
+                    .bold { font-weight: bold; }
+                    .title { font-size: 20px; font-weight: bold; }
+                    .sub { font-size: 11px; color: #555; }
+                    .total-row td { 
+                        font-weight: bold; 
+                        font-size: 15px; 
+                        border-top: 2px solid #333; 
+                        padding-top: 8px;
+                    }
+                    @media print {
+                        body {
+                            margin: 0;
+                            padding: 15px;
+                        }
+                    }
+                </style>
+            </head>
+            <body>${content}</body>
+            </html>
         `);
         win.document.close();
         win.focus();
@@ -61,6 +99,13 @@ function ReceiptModal({ bill, onClose }) {
                             <p className="font-bold text-base mt-1">{bill.bill_number}</p>
                             <p className="text-xs text-gray-500 mt-0.5">{new Date(bill.created_at).toLocaleString()}</p>
                         </div>
+                        {bill.customer && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 mb-3">
+                                <p className="text-xs text-gray-500 font-semibold">Customer</p>
+                                <p className="text-sm font-bold text-gray-800">{bill.customer.name}</p>
+                                <p className="text-xs text-gray-600">{bill.customer.phone}</p>
+                            </div>
+                        )}
                         <div className="border-t border-dashed border-gray-300 my-3" />
                         <table className="w-full text-xs">
                             <thead>
@@ -87,9 +132,23 @@ function ReceiptModal({ bill, onClose }) {
                             <span className="font-extrabold text-xl text-gray-900">LKR {parseFloat(bill.total).toFixed(2)}</span>
                         </div>
                         {bill.payment_method && (
-                            <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
-                                <span>Payment</span>
-                                <span className="font-semibold">{bill.payment_method === 'card' ? '💳 Card' : '💵 Cash'}</span>
+                            <div className="mt-3 space-y-1">
+                                <div className="flex justify-between items-center text-xs text-gray-500">
+                                    <span>Payment Method</span>
+                                    <span className="font-semibold">{bill.payment_method === 'card' ? '💳 Card' : '💵 Cash'}</span>
+                                </div>
+                                {bill.payment_method === 'cash' && bill.cash_amount && (
+                                    <>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-600">Cash Given</span>
+                                            <span className="font-semibold text-gray-800">LKR {parseFloat(bill.cash_amount).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm border-t border-gray-200 pt-1">
+                                            <span className="font-bold text-green-700">Balance</span>
+                                            <span className="font-extrabold text-green-700">LKR {(parseFloat(bill.cash_amount) - parseFloat(bill.total)).toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
                         <div className="border-t border-dashed border-gray-300 my-4" />
@@ -109,10 +168,19 @@ export default function Billing() {
     const [coins,      setCoins]      = useState([]);
     const [selections, setSelections] = useState({});
     const [payMethod,  setPayMethod]  = useState('cash');
+    const [cashAmount, setCashAmount] = useState('');
     const [loading,    setLoading]    = useState(false);
     const [pageLoad,   setPageLoad]   = useState(true);
     const [error,      setError]      = useState(null);
     const [receipt,    setReceipt]    = useState(null);
+    
+    // Customer states
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [customerResults, setCustomerResults] = useState([]);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [showCustomerForm, setShowCustomerForm] = useState(false);
+    const [customerForm, setCustomerForm] = useState({ name: '', phone: '' });
+    const [customerError, setCustomerError] = useState('');
 
     const toggle = (coin) => {
         setSelections(prev => {
@@ -133,16 +201,94 @@ export default function Billing() {
 
     const selectedItems = Object.values(selections);
     const grandTotal    = selectedItems.reduce((s, { coin, qty }) => s + parseFloat(coin.price) * qty, 0);
+    const cashGiven     = parseFloat(cashAmount) || 0;
+    const balance       = cashGiven - grandTotal;
+
+    // Customer search function
+    const handleCustomerSearch = async () => {
+        if (!customerSearch.trim()) {
+            setCustomerResults([]);
+            return;
+        }
+        
+        try {
+            const res = await fetch(`/api/customers`, {
+                headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+            });
+            const data = await res.json();
+            
+            // Filter customers by name or phone
+            const filtered = Array.isArray(data) ? data.filter(c => 
+                c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                c.phone.includes(customerSearch)
+            ) : [];
+            
+            setCustomerResults(filtered);
+        } catch (err) {
+            console.error('Error searching customers:', err);
+            setCustomerResults([]);
+        }
+    };
+
+    // Select customer from search results
+    const handleSelectCustomer = (customer) => {
+        setSelectedCustomer(customer);
+        setCustomerResults([]);
+        setCustomerSearch('');
+        setShowCustomerForm(false);
+    };
+
+    // Create new customer
+    const handleCreateCustomer = async (e) => {
+        e.preventDefault();
+        setCustomerError('');
+        
+        if (!customerForm.name || !customerForm.phone) {
+            setCustomerError('Name and phone are required');
+            return;
+        }
+        
+        try {
+            const res = await fetch('/api/customers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(customerForm)
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                setCustomerError(data.message || 'Failed to create customer');
+            } else {
+                setSelectedCustomer(data);
+                setCustomerForm({ name: '', phone: '' });
+                setShowCustomerForm(false);
+                setCustomerError('');
+            }
+        } catch (err) {
+            setCustomerError('Network error. Please try again.');
+        }
+    };
 
     const handleConfirm = async () => {
         if (selectedItems.length === 0) { setError('Please select at least one coin.'); return; }
+        if (payMethod === 'cash' && cashGiven < grandTotal) {
+            setError('Cash amount must be greater than or equal to total.');
+            return;
+        }
         setError(null); setLoading(true);
         try {
             const res = await fetch('/api/bills', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
+                    customer_id: selectedCustomer?.id || null,
                     payment_method: payMethod,
+                    cash_amount: payMethod === 'cash' ? cashGiven : null,
                     items: selectedItems.map(({ coin, qty }) => ({
                         coin_id: coin.id, coin_name: coin.name, coin_price: coin.price, quantity: qty,
                     })),
@@ -150,17 +296,38 @@ export default function Billing() {
             });
             const data = await res.json();
             if (!res.ok) { setError(data.message ?? 'Failed to create bill.'); }
-            else { setSelections({}); setReceipt(data); }
+            else { 
+                setSelections({}); 
+                setCashAmount(''); 
+                setSelectedCustomer(null);
+                setReceipt(data); 
+            }
         } catch (_) { setError('Network error. Please try again.'); }
         finally { setLoading(false); }
     };
 
     useEffect(() => {
+        if (!token) return;
+        
         fetch('/api/coins', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error('Failed to fetch coins');
+                return r.json();
+            })
             .then(d => setCoins(Array.isArray(d) ? d : []))
+            .catch(err => {
+                console.error('Error loading coins:', err);
+                setCoins([]);
+            })
             .finally(() => setPageLoad(false));
     }, [token]);
+
+    // Clear cash amount when switching to card payment
+    useEffect(() => {
+        if (payMethod === 'card') {
+            setCashAmount('');
+        }
+    }, [payMethod]);
 
     return (
         <div className="min-h-screen bg-gray-100">
@@ -184,6 +351,122 @@ export default function Billing() {
                                 <div className="px-5 py-4 bg-[#1a237e]">
                                     <p className="text-white font-bold text-sm uppercase tracking-wider">Available Coins</p>
                                     <p className="text-blue-300 text-xs mt-0.5">Select coins to add to the order</p>
+                                </div>
+
+                                {/* Customer Search/Create Section */}
+                                <div className="p-5 bg-gray-50 border-b border-gray-200">
+                                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">Customer (Optional)</p>
+                                    
+                                    {selectedCustomer ? (
+                                        <div className="bg-white border-2 border-green-500 rounded-xl p-3 flex items-center justify-between">
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-800">{selectedCustomer.name}</p>
+                                                <p className="text-xs text-gray-500">{selectedCustomer.phone}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setSelectedCustomer(null)}
+                                                className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {/* Search Bar */}
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={customerSearch}
+                                                    onChange={(e) => setCustomerSearch(e.target.value)}
+                                                    onKeyPress={(e) => e.key === 'Enter' && handleCustomerSearch()}
+                                                    placeholder="Search by name or phone..."
+                                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                                <button
+                                                    onClick={handleCustomerSearch}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-1"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                    </svg>
+                                                    Search
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowCustomerForm(!showCustomerForm)}
+                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                                                >
+                                                    + New
+                                                </button>
+                                            </div>
+
+                                            {/* Search Results */}
+                                            {customerResults.length > 0 && (
+                                                <div className="bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto">
+                                                    {customerResults.map(customer => (
+                                                        <button
+                                                            key={customer.id}
+                                                            onClick={() => handleSelectCustomer(customer)}
+                                                            className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-0 transition"
+                                                        >
+                                                            <p className="font-semibold text-sm text-gray-800">{customer.name}</p>
+                                                            <p className="text-xs text-gray-500">{customer.phone}</p>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Create Customer Form */}
+                                            {showCustomerForm && (
+                                                <div className="bg-white border border-gray-300 rounded-lg p-4">
+                                                    <p className="text-sm font-bold text-gray-700 mb-3">Add New Customer</p>
+                                                    <form onSubmit={handleCreateCustomer} className="space-y-3">
+                                                        <div>
+                                                            <input
+                                                                type="text"
+                                                                value={customerForm.name}
+                                                                onChange={(e) => setCustomerForm(prev => ({ ...prev, name: e.target.value }))}
+                                                                placeholder="Full Name"
+                                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <input
+                                                                type="text"
+                                                                value={customerForm.phone}
+                                                                onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: e.target.value }))}
+                                                                placeholder="Phone Number"
+                                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        {customerError && (
+                                                            <p className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">{customerError}</p>
+                                                        )}
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setShowCustomerForm(false);
+                                                                    setCustomerForm({ name: '', phone: '' });
+                                                                    setCustomerError('');
+                                                                }}
+                                                                className="flex-1 border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 transition"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="submit"
+                                                                className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg py-2 text-sm font-semibold transition"
+                                                            >
+                                                                Add Customer
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="p-5">
@@ -336,6 +619,45 @@ export default function Billing() {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Cash Amount Input - Only show when cash is selected */}
+                            {payMethod === 'cash' && selectedItems.length > 0 && (
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-gray-100">
+                                        <p className="text-sm font-bold text-gray-700 uppercase tracking-wider">Cash Payment</p>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-2">Cash Amount</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">LKR</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={cashAmount}
+                                                    onChange={(e) => setCashAmount(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full border-2 border-gray-300 rounded-xl pl-16 pr-4 py-3 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                                />
+                                            </div>
+                                        </div>
+                                        {cashAmount && cashGiven >= grandTotal && (
+                                            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-semibold text-green-700">Balance (Change)</span>
+                                                    <span className="text-lg font-extrabold text-green-700">LKR {balance.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {cashAmount && cashGiven < grandTotal && (
+                                            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3">
+                                                <p className="text-xs font-semibold text-red-700">⚠️ Insufficient amount. Need LKR {(grandTotal - cashGiven).toFixed(2)} more.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Error */}
                             {error && <p className="text-xs text-red-600 bg-red-50 rounded-xl px-4 py-3 border border-red-200">{error}</p>}

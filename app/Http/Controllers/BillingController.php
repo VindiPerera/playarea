@@ -22,6 +22,8 @@ class BillingController extends Controller
             'items.*.coin_price'  => 'required|numeric|min:0',
             'items.*.quantity'    => 'required|integer|min:1',
             'payment_method'      => 'nullable|in:cash,card',
+            'cash_amount'         => 'nullable|numeric|min:0',
+            'customer_id'         => 'nullable|exists:customers,id',
         ]);
 
         // Generate a unique bill number: BILL-YYYYMMDD-XXXX
@@ -33,9 +35,11 @@ class BillingController extends Controller
 
         $bill = Bill::create([
             'bill_number'    => $billNumber,
+            'customer_id'    => $request->customer_id,
             'total'          => $total,
             'status'         => 'paid',
             'payment_method' => $request->payment_method ?? 'cash',
+            'cash_amount'    => $request->cash_amount,
         ]);
 
         foreach ($request->items as $item) {
@@ -48,12 +52,12 @@ class BillingController extends Controller
             ]);
         }
 
-        return response()->json($bill->load('items'), 201);
+        return response()->json($bill->load(['items', 'customer']), 201);
     }
 
     public function show(Bill $bill)
     {
-        return $bill->load('items');
+        return $bill->load(['items', 'customer']);
     }
 
     public function destroy(Bill $bill)
