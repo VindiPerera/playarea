@@ -6,11 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class Bill extends Model
 {
-    protected $fillable = ['bill_number', 'customer_id', 'total', 'status', 'payment_method', 'cash_amount'];
+    protected $fillable = [
+        'bill_number', 'customer_id', 'entrance_fee',
+        'total', 'status', 'payment_method', 'cash_amount',
+    ];
 
     public function items()
     {
         return $this->hasMany(BillItem::class);
+    }
+
+    public function services()
+    {
+        return $this->hasMany(BillService::class);
     }
 
     public function customer()

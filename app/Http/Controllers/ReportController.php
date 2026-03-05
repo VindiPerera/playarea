@@ -8,6 +8,7 @@ use App\Models\Game;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\Bill;
 
 class ReportController extends Controller
 {
@@ -215,5 +216,62 @@ class ReportController extends Controller
         $pdf = Pdf::loadView('reports.pdf', $data);
         
         return $pdf->download('sales-report-' . $startDate . '-to-' . $endDate . '.pdf');
+    }
+
+    /**
+     * Get billing-based revenue report (entrance fees, coin sales, service charges)
+     */
+    public function billingReport(Request $request)
+    {
+        $startDate = $request->start_date ?? Carbon::now()->subDays(30)->format('Y-m-d');
+        $endDate = $request->end_date ?? Carbon::now()->format('Y-m-d');
+
+        // Only closed bills
+        $bills = Bill::with(['items', 'services', 'customer'])
+            ->where('status', 'closed')
+            ->whereDate('updated_at', '>=', $startDate)
+            ->whereDate('updated_at', '<=', $endDate)
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        // Aggregate totals
+        $totalEntranceFees = $bills->sum('entrance_fee');
+        $totalCoinRevenue = $bills->sum(function ($bill) {
+            return $bill->items->sum('subtotal');
+        });
+        $totalServiceRevenue = $bills->sum(function ($bill) {
+            return $bill->services->sum('subtotal');
+        });
+        $grandTotal = $bills->sum('total');
+
+        // Per-day breakdown
+        $dailyBreakdown = $bills->groupBy(function ($bill) {
+            return Carbon::parse($bill->updated_at)->format('Y-m-d');
+        })->map(function ($dayBills, $date) {
+            return [
+                'date' => $date,
+                'bill_count' => $dayBills->count(),
+                'entrance_fees' => $dayBills->sum('entrance_fee'),
+                'coin_revenue' => $dayBills->sum(function ($b) { return $b->items->sum('subtotal'); }),
+                'service_revenue' => $dayBills->sum(function ($b) { return $b->services->sum('subtotal'); }),
+                'total' => $dayBills->sum('total'),
+            ];
+        })->sortKeysDesc()->values();
+
+        return response()->json([
+            'summary' => [
+                'total_bills' => $bills->count(),
+                'total_entrance_fees' => $totalEntranceFees,
+                'total_coin_revenue' => $totalCoinRevenue,
+                'total_service_revenue' => $totalServiceRevenue,
+                'grand_total' => $grandTotal,
+            ],
+            'daily_breakdown' => $dailyBreakdown,
+            'bills' => $bills,
+            'period' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
+        ]);
     }
 }
