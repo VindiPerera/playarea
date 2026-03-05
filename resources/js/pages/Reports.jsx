@@ -288,7 +288,6 @@ export default function Reports() {
                                         { label: 'Bills Closed', value: billingReport.summary.total_bills, prefix: '', color: 'text-blue-700', bg: 'bg-blue-50' },
                                         { label: 'Entrance Fees', value: fmt(billingReport.summary.total_entrance_fees), prefix: 'LKR ', color: 'text-indigo-700', bg: 'bg-indigo-50' },
                                         { label: 'Coin Revenue', value: fmt(billingReport.summary.total_coin_revenue), prefix: 'LKR ', color: 'text-purple-700', bg: 'bg-purple-50' },
-                                        { label: 'Service Revenue', value: fmt(billingReport.summary.total_service_revenue), prefix: 'LKR ', color: 'text-teal-700', bg: 'bg-teal-50' },
                                     ].map(card => (
                                         <div key={card.label} className={`${card.bg} rounded-2xl border border-gray-200 p-5`}>
                                             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{card.label}</p>
@@ -319,7 +318,7 @@ export default function Reports() {
                                         <table className="min-w-full divide-y divide-gray-200">
                                             <thead>
                                                 <tr className="bg-gray-50">
-                                                    {['Date', 'Bills', 'Entrance Fees', 'Coin Revenue', 'Service Revenue', 'Day Total'].map(h => (
+                                                    {['Date', 'Bills', 'Entrance Fees', 'Coin Revenue', 'Day Total'].map(h => (
                                                         <th key={h} className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>
                                                     ))}
                                                 </tr>
@@ -333,7 +332,6 @@ export default function Reports() {
                                                         <td className="px-6 py-4 text-sm text-gray-600">{day.bill_count}</td>
                                                         <td className="px-6 py-4 text-sm text-indigo-700 font-semibold">LKR {fmt(day.entrance_fees)}</td>
                                                         <td className="px-6 py-4 text-sm text-purple-700 font-semibold">LKR {fmt(day.coin_revenue)}</td>
-                                                        <td className="px-6 py-4 text-sm text-teal-700 font-semibold">LKR {fmt(day.service_revenue)}</td>
                                                         <td className="px-6 py-4 text-sm text-green-700 font-extrabold">LKR {fmt(day.total)}</td>
                                                     </tr>
                                                 ))}
@@ -357,7 +355,7 @@ export default function Reports() {
                                         <table className="min-w-full divide-y divide-gray-200">
                                             <thead>
                                                 <tr className="bg-gray-50">
-                                                    {['Bill #', 'Customer', 'Date', 'Entrance', 'Coins', 'Services', 'Total', 'Payment', ''].map(h => (
+                                                    {['Bill #', 'Customer', 'Date', 'Entrance', 'Coins', 'Total', 'Payment', ''].map(h => (
                                                         <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>
                                                     ))}
                                                 </tr>
@@ -372,7 +370,6 @@ export default function Reports() {
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-indigo-700 font-semibold">LKR {fmt(bill.entrance_fee)}</td>
                                                         <td className="px-4 py-3 text-sm text-purple-700 font-semibold">LKR {fmt(bill.items?.reduce((s, i) => s + parseFloat(i.subtotal || 0), 0))}</td>
-                                                        <td className="px-4 py-3 text-sm text-teal-700 font-semibold">LKR {fmt(bill.services?.reduce((s, sv) => s + parseFloat(sv.subtotal || 0), 0))}</td>
                                                         <td className="px-4 py-3 text-sm font-extrabold text-green-700">LKR {fmt(bill.total)}</td>
                                                         <td className="px-4 py-3 text-xs text-gray-500 capitalize">{bill.payment_method ?? '—'}</td>
                                                         <td className="px-4 py-3 text-right">
@@ -557,21 +554,6 @@ export default function Reports() {
                                             <div key={item.id} className="flex justify-between text-sm">
                                                 <span className="text-gray-700">{item.coin_name} <span className="text-gray-400">× {item.quantity}</span></span>
                                                 <span className="font-semibold text-purple-700">LKR {fmt(item.subtotal)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Services */}
-                            {selectedBill.services?.length > 0 && (
-                                <div>
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Services</p>
-                                    <div className="space-y-1.5">
-                                        {selectedBill.services.map(svc => (
-                                            <div key={svc.id} className="flex justify-between text-sm">
-                                                <span className="text-gray-700">{svc.service_name}</span>
-                                                <span className="font-semibold text-teal-700">LKR {fmt(svc.subtotal)}</span>
                                             </div>
                                         ))}
                                     </div>

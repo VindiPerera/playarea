@@ -13,7 +13,6 @@ import Games     from './pages/Games';
 import Billing   from './pages/Billing';
 import Coins     from './pages/Coins';
 import Reports   from './pages/Reports';
-import Services  from './pages/Services';
 import Settings  from './pages/Settings';
 
 // ── Protected wrapper ─────────────────────────────────────────────────────────
@@ -34,7 +33,6 @@ function App() {
                     <Route path="/billing"    element={<Private><Billing /></Private>} />
                     <Route path="/coins"      element={<Private><Coins /></Private>} />
                     <Route path="/reports"    element={<Private><Reports /></Private>} />
-                    <Route path="/services"   element={<Private><Services /></Private>} />
                     <Route path="/settings"   element={<Private><Settings /></Private>} />
                     <Route path="/*"          element={<Private><Home /></Private>} />
                 </Routes>

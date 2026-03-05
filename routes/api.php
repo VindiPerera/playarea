@@ -6,7 +6,6 @@ use App\Http\Controllers\CoinController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SettingController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,12 +33,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/coins',           [CoinController::class, 'store']);
     Route::delete('/coins/{coin}',  [CoinController::class, 'destroy']);
 
-    // Services
-    Route::get('/services',                [ServiceController::class, 'index']);
-    Route::post('/services',               [ServiceController::class, 'store']);
-    Route::put('/services/{service}',      [ServiceController::class, 'update']);
-    Route::delete('/services/{service}',   [ServiceController::class, 'destroy']);
-
     // Settings
     Route::get('/settings',         [SettingController::class, 'index']);
     Route::put('/settings',         [SettingController::class, 'update']);
@@ -51,9 +44,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/bills/open',      [BillingController::class, 'openBill']);
     Route::get('/bills/{bill}',     [BillingController::class, 'show']);
     Route::post('/bills/{bill}/coins',    [BillingController::class, 'addCoins']);
-    Route::post('/bills/{bill}/services', [BillingController::class, 'addService']);
-    Route::post('/bills/{bill}/services/{billService}/stop',   [BillingController::class, 'stopService']);
-    Route::delete('/bills/{bill}/services/{billService}',       [BillingController::class, 'removeService']);
     Route::post('/bills/{bill}/close',    [BillingController::class, 'closeBill']);
     Route::delete('/bills/{bill}',  [BillingController::class, 'destroy']);
 

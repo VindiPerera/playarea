@@ -227,7 +227,7 @@ class ReportController extends Controller
         $endDate = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
         // Only closed bills
-        $bills = Bill::with(['items', 'services', 'customer'])
+        $bills = Bill::with(['items', 'customer'])
             ->where('status', 'closed')
             ->whereDate('updated_at', '>=', $startDate)
             ->whereDate('updated_at', '<=', $endDate)
@@ -238,9 +238,6 @@ class ReportController extends Controller
         $totalEntranceFees = $bills->sum('entrance_fee');
         $totalCoinRevenue = $bills->sum(function ($bill) {
             return $bill->items->sum('subtotal');
-        });
-        $totalServiceRevenue = $bills->sum(function ($bill) {
-            return $bill->services->sum('subtotal');
         });
         $grandTotal = $bills->sum('total');
 
@@ -253,7 +250,6 @@ class ReportController extends Controller
                 'bill_count' => $dayBills->count(),
                 'entrance_fees' => $dayBills->sum('entrance_fee'),
                 'coin_revenue' => $dayBills->sum(function ($b) { return $b->items->sum('subtotal'); }),
-                'service_revenue' => $dayBills->sum(function ($b) { return $b->services->sum('subtotal'); }),
                 'total' => $dayBills->sum('total'),
             ];
         })->sortKeysDesc()->values();
@@ -263,7 +259,6 @@ class ReportController extends Controller
                 'total_bills' => $bills->count(),
                 'total_entrance_fees' => $totalEntranceFees,
                 'total_coin_revenue' => $totalCoinRevenue,
-                'total_service_revenue' => $totalServiceRevenue,
                 'grand_total' => $grandTotal,
             ],
             'daily_breakdown' => $dailyBreakdown,

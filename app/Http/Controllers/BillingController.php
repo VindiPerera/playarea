@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bill;
-use App\Models\BillService;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,7 +11,7 @@ class BillingController extends Controller
 {
     public function index()
     {
-        return Bill::with(['items', 'services', 'customer'])->latest()->get();
+        return Bill::with(['items', 'customer'])->latest()->get();
     }
 
     /**
@@ -20,14 +19,14 @@ class BillingController extends Controller
      */
     public function openBills()
     {
-        return Bill::with(['items', 'services', 'customer'])
+        return Bill::with(['items', 'customer'])
             ->where('status', 'open')
             ->latest()
             ->get();
     }
 
     /**
-     * Open a new bill for a customer.
+     * Open a new bill for a customer. Timer starts now.
      */
     public function openBill(Request $request)
     {
@@ -35,20 +34,37 @@ class BillingController extends Controller
             'customer_id' => 'nullable|exists:customers,id',
         ]);
 
-        $entranceFee = Setting::where('key', 'entrance_fee')->value('value') ?? 0;
-        $billNumber  = 'BILL-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4));
+        // Snapshot entrance fee tier pricing from settings
+        $settings = Setting::all()->pluck('value', 'key');
+        $basePrice     = floatval($settings['entrance_base_price'] ?? 0);
+        $baseDuration  = intval($settings['entrance_base_duration'] ?? 0);
+        $stage1Price   = $settings['entrance_stage1_price'] ?? null;
+        $stage1Dur     = $settings['entrance_stage1_duration'] ?? null;
+        $stage2Price   = $settings['entrance_stage2_price'] ?? null;
+        $stage2Dur     = $settings['entrance_stage2_duration'] ?? null;
+
+        $billNumber = 'BILL-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4));
 
         $bill = Bill::create([
-            'bill_number'    => $billNumber,
-            'customer_id'    => $request->customer_id,
-            'entrance_fee'   => $entranceFee,
-            'total'          => 0,
-            'status'         => 'open',
-            'payment_method' => null,
-            'cash_amount'    => null,
+            'bill_number'             => $billNumber,
+            'customer_id'             => $request->customer_id,
+            'entrance_fee'            => $basePrice,
+            'total'                   => 0,
+            'status'                  => 'open',
+            'payment_method'          => null,
+            'cash_amount'             => null,
+            'started_at'              => now(),
+            'entrance_base_price'     => $basePrice,
+            'entrance_base_duration'  => $baseDuration,
+            'entrance_stage1_price'   => $stage1Price,
+            'entrance_stage1_duration'=> $stage1Dur,
+            'entrance_stage2_price'   => $stage2Price,
+            'entrance_stage2_duration'=> $stage2Dur,
         ]);
 
-        return response()->json($bill->load(['items', 'services', 'customer']), 201);
+        $this->recalculateTotal($bill);
+
+        return response()->json($bill->load(['items', 'customer']), 201);
     }
 
     /**
@@ -80,86 +96,11 @@ class BillingController extends Controller
 
         $this->recalculateTotal($bill);
 
-        return response()->json($bill->load(['items', 'services', 'customer']));
+        return response()->json($bill->load(['items', 'customer']));
     }
 
     /**
-     * Add a service to an open bill (starts the timer).
-     */
-    public function addService(Request $request, Bill $bill)
-    {
-        if ($bill->status !== 'open') {
-            return response()->json(['message' => 'Bill is already closed.'], 422);
-        }
-
-        $request->validate([
-            'service_id' => 'required|exists:services,id',
-        ]);
-
-        $service = \App\Models\Service::findOrFail($request->service_id);
-
-        $billService = $bill->services()->create([
-            'service_id'     => $service->id,
-            'service_name'   => $service->name,
-            'base_price'     => $service->base_price,
-            'base_duration'  => $service->base_duration,
-            'stage1_duration' => $service->stage1_duration,
-            'stage1_price'   => $service->stage1_price,
-            'stage2_duration' => $service->stage2_duration,
-            'stage2_price'   => $service->stage2_price,
-            'started_at'     => now(),
-            'subtotal'       => $service->base_price,
-        ]);
-
-        $this->recalculateTotal($bill);
-
-        return response()->json($bill->load(['items', 'services', 'customer']));
-    }
-
-    /**
-     * Stop a service (end the timer and calculate final cost).
-     */
-    public function stopService(Request $request, Bill $bill, BillService $billService)
-    {
-        if ($bill->status !== 'open') {
-            return response()->json(['message' => 'Bill is already closed.'], 422);
-        }
-
-        if ($billService->bill_id !== $bill->id) {
-            return response()->json(['message' => 'Service does not belong to this bill.'], 422);
-        }
-
-        $billService->ended_at = now();
-        $billService->subtotal = $this->calculateServiceCost($billService);
-        $billService->save();
-
-        $this->recalculateTotal($bill);
-
-        return response()->json($bill->load(['items', 'services', 'customer']));
-    }
-
-    /**
-     * Remove a service from an open bill entirely.
-     */
-    public function removeService(Request $request, Bill $bill, BillService $billService)
-    {
-        if ($bill->status !== 'open') {
-            return response()->json(['message' => 'Bill is already closed.'], 422);
-        }
-
-        if ($billService->bill_id !== $bill->id) {
-            return response()->json(['message' => 'Service does not belong to this bill.'], 422);
-        }
-
-        $billService->delete();
-
-        $this->recalculateTotal($bill);
-
-        return response()->json($bill->load(['items', 'services', 'customer']));
-    }
-
-    /**
-     * Close/finalize a bill.
+     * Close/finalize a bill. Calculate entrance fee based on elapsed time.
      */
     public function closeBill(Request $request, Bill $bill)
     {
@@ -172,14 +113,9 @@ class BillingController extends Controller
             'cash_amount'    => 'nullable|numeric|min:0',
         ]);
 
-        // Stop all running services
-        foreach ($bill->services as $bs) {
-            if (!$bs->ended_at) {
-                $bs->ended_at = now();
-                $bs->subtotal = $this->calculateServiceCost($bs);
-                $bs->save();
-            }
-        }
+        // Calculate entrance fee based on elapsed time
+        $bill->entrance_fee = $this->calculateEntranceFee($bill);
+        $bill->save();
 
         $this->recalculateTotal($bill);
 
@@ -189,7 +125,7 @@ class BillingController extends Controller
             'cash_amount'    => $request->payment_method === 'cash' ? $request->cash_amount : null,
         ]);
 
-        return response()->json($bill->load(['items', 'services', 'customer']));
+        return response()->json($bill->load(['items', 'customer']));
     }
 
     /**
@@ -239,7 +175,7 @@ class BillingController extends Controller
 
     public function show(Bill $bill)
     {
-        return $bill->load(['items', 'services', 'customer']);
+        return $bill->load(['items', 'customer']);
     }
 
     public function destroy(Bill $bill)
@@ -249,27 +185,25 @@ class BillingController extends Controller
     }
 
     /**
-     * Calculate the cost for a service based on elapsed time.
+     * Calculate the entrance fee based on elapsed time using 3-tier pricing.
      */
-    private function calculateServiceCost(BillService $bs): float
+    private function calculateEntranceFee(Bill $bill): float
     {
-        $start = $bs->started_at;
-        $end   = $bs->ended_at ?? now();
+        $start = $bill->started_at ?? $bill->created_at;
+        $end   = now();
         $elapsedMinutes = max(0, $start->diffInMinutes($end));
 
-        $cost = $bs->base_price;
-        $remaining = $elapsedMinutes - $bs->base_duration;
+        $cost = $bill->entrance_base_price;
+        $remaining = $elapsedMinutes - $bill->entrance_base_duration;
 
         if ($remaining <= 0) {
             return $cost;
         }
 
         // Stage 1
-        if ($bs->stage1_duration && $bs->stage1_price) {
-            if ($remaining > 0) {
-                $cost += $bs->stage1_price;
-                $remaining -= $bs->stage1_duration;
-            }
+        if ($bill->entrance_stage1_duration && $bill->entrance_stage1_price) {
+            $cost += $bill->entrance_stage1_price;
+            $remaining -= $bill->entrance_stage1_duration;
         }
 
         if ($remaining <= 0) {
@@ -277,9 +211,9 @@ class BillingController extends Controller
         }
 
         // Stage 2 (recurring)
-        if ($bs->stage2_duration && $bs->stage2_price && $remaining > 0) {
-            $stage2Cycles = ceil($remaining / $bs->stage2_duration);
-            $cost += $bs->stage2_price * $stage2Cycles;
+        if ($bill->entrance_stage2_duration && $bill->entrance_stage2_price && $remaining > 0) {
+            $stage2Cycles = ceil($remaining / $bill->entrance_stage2_duration);
+            $cost += $bill->entrance_stage2_price * $stage2Cycles;
         }
 
         return $cost;
@@ -293,13 +227,11 @@ class BillingController extends Controller
         $bill->refresh();
 
         $coinTotal    = $bill->items->sum('subtotal');
-        $serviceTotal = 0;
-        foreach ($bill->services as $bs) {
-            $serviceTotal += $bs->ended_at ? $bs->subtotal : $this->calculateServiceCost($bs);
-        }
+        $entranceFee  = $this->calculateEntranceFee($bill);
 
         $bill->update([
-            'total' => $bill->entrance_fee + $coinTotal + $serviceTotal,
+            'entrance_fee' => $entranceFee,
+            'total'        => $entranceFee + $coinTotal,
         ]);
     }
 }

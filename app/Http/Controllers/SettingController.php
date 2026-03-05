@@ -16,13 +16,29 @@ class SettingController extends Controller
     public function update(Request $request)
     {
         $request->validate([
-            'entrance_fee' => 'required|numeric|min:0',
+            'entrance_base_price'     => 'required|numeric|min:0',
+            'entrance_base_duration'  => 'required|integer|min:1',
+            'entrance_stage1_price'   => 'nullable|numeric|min:0',
+            'entrance_stage1_duration'=> 'nullable|integer|min:1',
+            'entrance_stage2_price'   => 'nullable|numeric|min:0',
+            'entrance_stage2_duration'=> 'nullable|integer|min:1',
         ]);
 
-        Setting::updateOrCreate(
-            ['key' => 'entrance_fee'],
-            ['value' => $request->entrance_fee]
-        );
+        $keys = [
+            'entrance_base_price',
+            'entrance_base_duration',
+            'entrance_stage1_price',
+            'entrance_stage1_duration',
+            'entrance_stage2_price',
+            'entrance_stage2_duration',
+        ];
+
+        foreach ($keys as $key) {
+            Setting::updateOrCreate(
+                ['key' => $key],
+                ['value' => $request->$key ?? null]
+            );
+        }
 
         return response()->json(['message' => 'Settings updated successfully.']);
     }

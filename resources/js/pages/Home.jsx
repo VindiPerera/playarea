@@ -51,18 +51,6 @@ const IconCoin = () => (
     </svg>
 );
 
-const IconService = () => (
-    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12">
-        <rect x="12" y="12" width="40" height="40" rx="8"/>
-        <circle cx="32" cy="28" r="8"/>
-        <path d="M20 48c0-7 5-12 12-12s12 5 12 12"/>
-        <line x1="32" y1="8" x2="32" y2="12"/>
-        <line x1="32" y1="52" x2="32" y2="56"/>
-        <line x1="8" y1="32" x2="12" y2="32"/>
-        <line x1="52" y1="32" x2="56" y2="32"/>
-    </svg>
-);
-
 const IconSetting = () => (
     <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12">
         <circle cx="32" cy="32" r="10"/>
@@ -113,14 +101,6 @@ const cards = [
         Icon:  IconReport,
         bg:    '#2e7d32',   // green
         path:  '/reports',
-    },
-    {
-        key:   'services',
-        title: 'SERVICES',
-        desc:  'Create and manage play area services with time-based pricing stages.',
-        Icon:  IconService,
-        bg:    '#00838f',   // teal
-        path:  '/services',
     },
     {
         key:   'settings',
