@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 // ── Print Receipt Function ───────────────────────────────────────────────────
 function printReceipt(bill) {
     const win = window.open('', '_blank', 'width=800,height=900');
-    
+
     win.document.write(`
         <html>
         <head>
@@ -21,13 +21,13 @@ function printReceipt(bill) {
                     padding: 0;
                     box-sizing: border-box;
                 }
-                body { 
-                    font-family: 'Courier New', monospace; 
-                    margin: 0 auto; 
-                    padding: 15mm;
+                body {
+                    font-family: 'Arial', sans-serif;
+                    margin: 0 auto;
+                    padding: 10mm 5mm;
                     max-width: 90mm;
                     font-size: 14px;
-                    line-height: 1.5;
+
                     color: #000;
                     background: #fff;
                 }
@@ -38,29 +38,30 @@ function printReceipt(bill) {
                     border-bottom: 2px solid #000;
                 }
                 .logo {
-                    max-width: 160px;
+                    max-width: 200px;
                     height: auto;
                     margin: 0 auto 8px;
                     display: block;
                 }
                 .center { text-align: center; }
-                .divider { 
-                    border-top: 1px dashed #000; 
-                    margin: 12px 0; 
+                .divider {
+                    border-top: 1px dashed #000;
+                    margin: 12px 0;
                 }
                 .section-divider {
                     border-top: 2px solid #000;
                     margin: 15px 0;
                 }
-                table { 
-                    width: 100%; 
-                    border-collapse: collapse; 
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
                     margin: 12px 0;
                 }
-                td, th { 
-                    padding: 6px 4px; 
+                td, th {
+                    padding: 6px 4px;
                     text-align: left;
                     color: #000;
+                    font-size: 13px;
                 }
                 th {
                     border-bottom: 1px solid #000;
@@ -68,15 +69,15 @@ function printReceipt(bill) {
                 }
                 .right { text-align: right; }
                 .bold { font-weight: bold; }
-                .title { 
-                    font-size: 22px; 
-                    font-weight: bold; 
+                .title {
+                    font-size: 18px;
+                    font-weight: bold;
                     color: #000;
                     margin-bottom: 4px;
                 }
-                .subtitle { 
-                    font-size: 13px; 
-                    color: #000; 
+                .subtitle {
+                    font-size: 13px;
+                    color: #000;
                     margin-bottom: 3px;
                 }
                 .bill-label {
@@ -86,7 +87,7 @@ function printReceipt(bill) {
                     margin-top: 10px;
                 }
                 .bill-number {
-                    font-size: 16px;
+                    font-size: 14px;
                     font-weight: bold;
                     color: #000;
                     margin: 5px 0;
@@ -121,15 +122,16 @@ function printReceipt(bill) {
                 }
                 .item-row {
                     border-bottom: 1px solid #ccc;
+                      font-weight: 600;
                 }
                 .item-name {
-                    font-weight: 600;
+
                     color: #000;
-                    font-size: 13px;
+                    font-size: 12px;
                 }
                 .item-detail {
                     color: #000;
-                    font-size: 13px;
+                    font-size: 12px;
                 }
                 .total-section {
                     border-top: 2px solid #000;
@@ -138,13 +140,13 @@ function printReceipt(bill) {
                 }
                 .total-label {
                     font-weight: bold;
-                    font-size: 16px;
+                    font-size: 13px;
                     text-transform: uppercase;
                     color: #000;
                 }
                 .total-amount {
                     font-weight: bold;
-                    font-size: 20px;
+                    font-size: 14px;
                     color: #000;
                     text-align: right;
                 }
@@ -168,12 +170,12 @@ function printReceipt(bill) {
                 }
                 .balance-label {
                     font-weight: bold;
-                    font-size: 15px;
+                    font-size: 13px;
                     color: #000;
                 }
                 .balance-amount {
                     font-weight: bold;
-                    font-size: 15px;
+                    font-size: 12px;
                     color: #000;
                 }
                 .footer {
@@ -183,12 +185,13 @@ function printReceipt(bill) {
                     text-align: center;
                 }
                 .footer-text {
-                    font-size: 13px;
+                    font-size: 10px;
                     color: #000;
                     margin: 4px 0;
+                    font-weight: 600;
                 }
                 .footer-url {
-                    font-size: 12px;
+                    font-size: 10px;
                     color: #000;
                     margin-top: 6px;
                 }
@@ -199,7 +202,7 @@ function printReceipt(bill) {
                     }
                     body {
                         margin: 0;
-                        padding: 12mm;
+                        padding: 5mm 6mm 12mm;
                     }
                 }
             </style>
@@ -207,9 +210,9 @@ function printReceipt(bill) {
         <body>
             <!-- Logo and Header -->
             <div class="logo-container">
-                <img src="/images/logo.jpeg" alt="PlayArea Logo" class="logo" />
-                <p class="title">PLAYAREA</p>
-                <p class="subtitle">Games Platform</p>
+                <img src="/images/logo.png" alt="PlayArea Logo" class="logo" />
+                <p class="title">PLAY AREA</p>
+
             </div>
 
             <!-- Bill Details -->
@@ -282,13 +285,15 @@ function printReceipt(bill) {
 
             <!-- Footer -->
             <div class="footer">
-                <p class="footer-text">Thank you for your purchase!</p>
-                <p class="footer-url">www.playarea.com</p>
+                <p class="footer-text">
+                We hope you enjoyed the play area! Come again for more fun times.
+                </p>
+
             </div>
         </body>
         </html>
     `);
-    
+
     win.document.close();
     win.focus();
     win.onafterprint = () => win.close();
@@ -306,7 +311,7 @@ export default function Billing() {
     const [loading,    setLoading]    = useState(false);
     const [pageLoad,   setPageLoad]   = useState(true);
     const [error,      setError]      = useState(null);
-    
+
     // Customer states
     const [customerSearch, setCustomerSearch] = useState('');
     const [customerResults, setCustomerResults] = useState([]);
@@ -343,19 +348,19 @@ export default function Billing() {
             setCustomerResults([]);
             return;
         }
-        
+
         try {
             const res = await fetch(`/api/customers`, {
                 headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
             });
             const data = await res.json();
-            
+
             // Filter customers by name or phone
-            const filtered = Array.isArray(data) ? data.filter(c => 
+            const filtered = Array.isArray(data) ? data.filter(c =>
                 c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
                 c.phone.includes(customerSearch)
             ) : [];
-            
+
             setCustomerResults(filtered);
         } catch (err) {
             console.error('Error searching customers:', err);
@@ -375,12 +380,12 @@ export default function Billing() {
     const handleCreateCustomer = async (e) => {
         e.preventDefault();
         setCustomerError('');
-        
+
         if (!customerForm.name || !customerForm.phone) {
             setCustomerError('Name and phone are required');
             return;
         }
-        
+
         try {
             const res = await fetch('/api/customers', {
                 method: 'POST',
@@ -391,9 +396,9 @@ export default function Billing() {
                 },
                 body: JSON.stringify(customerForm)
             });
-            
+
             const data = await res.json();
-            
+
             if (!res.ok) {
                 setCustomerError(data.message || 'Failed to create customer');
             } else {
@@ -429,9 +434,9 @@ export default function Billing() {
             });
             const data = await res.json();
             if (!res.ok) { setError(data.message ?? 'Failed to create bill.'); }
-            else { 
-                setSelections({}); 
-                setCashAmount(''); 
+            else {
+                setSelections({});
+                setCashAmount('');
                 setSelectedCustomer(null);
                 printReceipt(data);
             }
@@ -441,7 +446,7 @@ export default function Billing() {
 
     useEffect(() => {
         if (!token) return;
-        
+
         fetch('/api/coins', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
             .then(r => {
                 if (!r.ok) throw new Error('Failed to fetch coins');
@@ -489,7 +494,7 @@ export default function Billing() {
                                 {/* Customer Search/Create Section */}
                                 <div className="p-5 bg-gray-50 border-b border-gray-200">
                                     <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">Customer (Optional)</p>
-                                    
+
                                     {selectedCustomer ? (
                                         <div className="bg-white border-2 border-green-500 rounded-xl p-3 flex items-center justify-between">
                                             <div>
