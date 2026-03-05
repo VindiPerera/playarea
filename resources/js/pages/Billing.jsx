@@ -224,7 +224,16 @@ function printCoinReceipt(bill, coinItems) {
     win.document.close();
     win.focus();
     win.onafterprint = () => win.close();
-    setTimeout(() => win.print(), 300);
+    
+    // Wait for logo image to load before printing
+    const logoImg = win.document.querySelector('.logo');
+    if (logoImg && !logoImg.complete) {
+        logoImg.onload = () => win.print();
+        logoImg.onerror = () => setTimeout(() => win.print(), 500);
+        setTimeout(() => win.print(), 2000);
+    } else {
+        setTimeout(() => win.print(), 500);
+    }
 }
 
 // ── Print Final Bill ───────────────────────────────────────────────────────────
@@ -554,7 +563,16 @@ function printFinalBill(bill) {
     win.document.close();
     win.focus();
     win.onafterprint = () => win.close();
-    setTimeout(() => win.print(), 300);
+    
+    // Wait for logo image to load before printing
+    const logoImg = win.document.querySelector('.logo');
+    if (logoImg && !logoImg.complete) {
+        logoImg.onload = () => win.print();
+        logoImg.onerror = () => setTimeout(() => win.print(), 500);
+        setTimeout(() => win.print(), 2000);
+    } else {
+        setTimeout(() => win.print(), 500);
+    }
 }
 
 // ── Helper: Calculate service cost client-side for live display ────────────────
