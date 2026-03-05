@@ -212,6 +212,7 @@ function printReceipt(bill) {
             <div class="logo-container">
                 <img src="/images/logo.png" alt="PlayArea Logo" class="logo" />
                 <p class="title">PLAY AREA</p>
+                <p class="bill-date">Tel : 077 306 3000</p>
 
             </div>
 
