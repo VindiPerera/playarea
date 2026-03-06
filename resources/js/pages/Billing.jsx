@@ -718,6 +718,14 @@ export default function Billing() {
         ? openBills.filter(b => b.bill_number.toLowerCase().includes(billSearch.toLowerCase()))
         : openBills;
 
+    // Auto-redirect to the open bill when search matches exactly one
+    useEffect(() => {
+        if (billSearch.trim() && filteredBills.length === 1 && !activeBill) {
+            setActiveBill(filteredBills[0]);
+            setBillSearch('');
+        }
+    }, [filteredBills, billSearch, activeBill]);
+
     return (
         <div className="min-h-screen bg-gray-100">
             <Header />

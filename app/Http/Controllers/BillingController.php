@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Bill;
 use App\Models\Setting;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class BillingController extends Controller
 {
@@ -43,7 +42,7 @@ class BillingController extends Controller
         $stage2Price   = $settings['entrance_stage2_price'] ?? null;
         $stage2Dur     = $settings['entrance_stage2_duration'] ?? null;
 
-        $billNumber = 'BILL-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4));
+        $billNumber = $this->generateBillNumber();
 
         $bill = Bill::create([
             'bill_number'             => $billNumber,
@@ -144,7 +143,7 @@ class BillingController extends Controller
             'customer_id'         => 'nullable|exists:customers,id',
         ]);
 
-        $billNumber = 'BILL-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4));
+        $billNumber = $this->generateBillNumber();
 
         $total = collect($request->items)->sum(function ($item) {
             return $item['coin_price'] * $item['quantity'];
@@ -233,5 +232,25 @@ class BillingController extends Controller
             'entrance_fee' => $entranceFee,
             'total'        => $entranceFee + $coinTotal,
         ]);
+    }
+
+    /**
+     * Generate a sequential daily bill number in YYMMDD-NNNN format.
+     */
+    private function generateBillNumber(): string
+    {
+        $prefix = now()->format('ymd');
+
+        $lastBill = Bill::where('bill_number', 'like', $prefix . '-%')
+            ->orderByDesc('bill_number')
+            ->first();
+
+        $nextSeq = 1;
+        if ($lastBill) {
+            $parts = explode('-', $lastBill->bill_number);
+            $nextSeq = intval(end($parts)) + 1;
+        }
+
+        return $prefix . '-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
     }
 }
