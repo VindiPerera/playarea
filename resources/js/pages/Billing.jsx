@@ -86,11 +86,8 @@ function printEntranceReceipt(bill) {
                 @page { size: 90mm auto; margin: 12mm; }
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body { font-family: 'Arial', sans-serif; margin: 0 auto; padding: 10mm 5mm; max-width: 90mm; font-size: 14px; color: #000; background: #fff; }
-                .logo-container { text-align: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #000; }
-                .logo { max-width: 200px; height: auto; margin: 0 auto 8px; display: block; }
                 .center { text-align: center; }
                 .divider { border-top: 1px dashed #000; margin: 12px 0; }
-                .title { font-size: 18px; font-weight: bold; color: #000; margin-bottom: 4px; }
                 .bill-label { font-size: 13px; color: #000; font-weight: bold; margin-top: 10px; }
                 .bill-number { font-size: 14px; font-weight: bold; color: #000; margin: 5px 0; }
                 .bill-date { font-size: 13px; color: #000; margin-bottom: 8px; }
@@ -113,11 +110,6 @@ function printEntranceReceipt(bill) {
             </style>
         </head>
         <body>
-            <div class="logo-container">
-                <img src="/images/logo.png" alt="PlayArea Logo" class="logo" />
-                <p class="title">PLAY AREA</p>
-                <p class="bill-date">Tel : 077 306 3000</p>
-            </div>
             <div class="center">
                 <p class="bill-label">ENTRANCE RECEIPT</p>
                 <p class="bill-number">${bill.bill_number}</p>
