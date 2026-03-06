@@ -1,7 +1,26 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
+import JsBarcode from 'jsbarcode';
+
+// ── Generate barcode as data URL ──────────────────────────────────────────────
+function generateBarcodeDataUrl(text) {
+    try {
+        const canvas = document.createElement('canvas');
+        JsBarcode(canvas, text, {
+            format: 'CODE128',
+            width: 2,
+            height: 50,
+            displayValue: true,
+            fontSize: 14,
+            margin: 5,
+        });
+        return canvas.toDataURL('image/png');
+    } catch {
+        return null;
+    }
+}
 
 // ── Calculate entrance fee client-side (mirrors server logic) ─────────────────
 function calcEntranceFee(bill) {
@@ -54,6 +73,7 @@ function formatElapsed(startedAt) {
 // ── Print Entrance Receipt ─────────────────────────────────────────────────────
 function printEntranceReceipt(bill) {
     const win = window.open('', '_blank', 'width=800,height=900');
+    const barcodeDataUrl = generateBarcodeDataUrl(bill.bill_number);
     const basePrice = parseFloat(bill.entrance_base_price || 0);
     const baseDuration = bill.entrance_base_duration || 0;
     const startTime = bill.started_at ? new Date(bill.started_at).toLocaleString() : new Date().toLocaleString();
@@ -140,6 +160,12 @@ function printEntranceReceipt(bill) {
                     <span class="total-amount">LKR ${basePrice.toFixed(2)}</span>
                 </div>
             </div>
+
+            ${barcodeDataUrl ? `
+            <div style="text-align:center; margin-top:15px; padding-top:10px; border-top:1px dashed #000;">
+                <img src="${barcodeDataUrl}" alt="${bill.bill_number}" style="max-width:100%; height:auto;" />
+            </div>
+            ` : ''}
 
             <div class="footer">
                 <p class="footer-text">Timer is running. Additional charges may apply based on duration.</p>
@@ -260,6 +286,7 @@ function printCoinReceipt(bill, coinItems) {
 // ── Print Final Bill ───────────────────────────────────────────────────────────
 function printFinalBill(bill) {
     const win = window.open('', '_blank', 'width=800,height=900');
+    const barcodeDataUrl = generateBarcodeDataUrl(bill.bill_number);
     const coinTotal   = bill.items.reduce((s, i) => s + parseFloat(i.subtotal), 0);
     const entranceFee = parseFloat(bill.entrance_fee) || 0;
 
@@ -395,6 +422,12 @@ function printFinalBill(bill) {
                 ` : ''}
             </div>` : ''}
 
+            ${barcodeDataUrl ? `
+            <div style="text-align:center; margin-top:15px; padding-top:10px; border-top:1px dashed #000;">
+                <img src="${barcodeDataUrl}" alt="${bill.bill_number}" style="max-width:100%; height:auto;" />
+            </div>
+            ` : ''}
+
             <div class="footer">
                 <p class="footer-text">We hope you enjoyed the play area! Come again for more fun times.</p>
             </div>
@@ -441,6 +474,44 @@ export default function Billing() {
 
     // Bill search
     const [billSearch, setBillSearch] = useState('');
+    const billSearchRef = useRef(null);
+
+    // Barcode scanner detection
+    useEffect(() => {
+        let buffer = '';
+        let lastKeyTime = 0;
+
+        const handleKeyDown = (e) => {
+            // Ignore if user is typing in an input/textarea (except the bill search input)
+            const tag = e.target.tagName;
+            if ((tag === 'INPUT' || tag === 'TEXTAREA') && e.target !== billSearchRef.current) return;
+
+            const now = Date.now();
+
+            if (e.key === 'Enter') {
+                if (buffer.length >= 5) {
+                    setBillSearch(buffer);
+                    setActiveBill(null);
+                    if (billSearchRef.current) billSearchRef.current.focus();
+                }
+                buffer = '';
+                return;
+            }
+
+            // Only accept printable single characters
+            if (e.key.length !== 1) return;
+
+            // If too much time passed since last key, reset buffer
+            if (now - lastKeyTime > 100) {
+                buffer = '';
+            }
+            lastKeyTime = now;
+            buffer += e.key;
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // UI
     const [loading, setLoading]   = useState(false);
@@ -681,9 +752,9 @@ export default function Billing() {
                                         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                         </svg>
-                                        <input type="text" value={billSearch}
+                                        <input type="text" value={billSearch} ref={billSearchRef}
                                             onChange={e => { setBillSearch(e.target.value); setError(null); }}
-                                            placeholder="Type bill number to filter open bills…"
+                                            placeholder="Type bill number or scan barcode…"
                                             className="w-full border border-gray-300 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                                         {billSearch && (
                                             <button onClick={() => setBillSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
