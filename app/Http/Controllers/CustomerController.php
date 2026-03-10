@@ -24,6 +24,18 @@ class CustomerController extends Controller
         return response()->json($customer, 201);
     }
 
+    public function update(Request $request, Customer $customer)
+    {
+        $validated = $request->validate([
+            'name'  => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+        ]);
+
+        $customer->update($validated);
+
+        return response()->json($customer);
+    }
+
     public function destroy(Customer $customer)
     {
         $customer->delete();

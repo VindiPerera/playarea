@@ -195,12 +195,13 @@ function CustomerCard({ customer }) {
 export default function Customers() {
     const { token }                     = useAuth();
     const navigate                      = useNavigate();
-    const [customers, setCustomers]     = useState([]);
-    const [games,     setGames]         = useState([]);
-    const [loading,   setLoading]       = useState(true);
-    const [search,    setSearch]        = useState('');
-    const [filterGame, setFilterGame]   = useState('');
-    const [showModal, setShowModal]     = useState(false);
+    const [customers,       setCustomers]       = useState([]);
+    const [games,           setGames]           = useState([]);
+    const [loading,         setLoading]         = useState(true);
+    const [search,          setSearch]          = useState('');
+    const [filterGame,      setFilterGame]      = useState('');
+    const [showModal,       setShowModal]       = useState(false);
+    const [editingCustomer, setEditingCustomer] = useState(null);
 
     useEffect(() => {
         if (!token) return;
@@ -225,9 +226,9 @@ export default function Customers() {
         }).finally(() => setLoading(false));
     }, [token]);
 
-    const handleSaved = (customer) => {
-        setCustomers(prev => [customer, ...prev]);
-    };
+    const handleSaved = (customer) => setCustomers(prev => [customer, ...prev]);
+    const handleUpdated = (customer) => setCustomers(prev => prev.map(c => c.id === customer.id ? customer : c));
+    const handleDeleted = (id) => setCustomers(prev => prev.filter(c => c.id !== id));
 
     const filtered = customers.filter(c => {
         const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -310,18 +311,24 @@ export default function Customers() {
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
                         {filtered.map(c => (
-                            <CustomerCard key={c.id} customer={c} />
+                            <CustomerCard
+                                key={c.id}
+                                customer={c}
+                                token={token}
+                                onEdited={setEditingCustomer}
+                                onDeleted={handleDeleted}
+                            />
                         ))}
                     </div>
                 )}
             </main>
 
-            {showModal && (
-                <AddCustomerModal
+            {(showModal || editingCustomer) && (
+                <CustomerModal
                     token={token}
-                    games={games}
-                    onClose={() => setShowModal(false)}
-                    onSaved={handleSaved}
+                    customer={editingCustomer}
+                    onClose={() => { setShowModal(false); setEditingCustomer(null); }}
+                    onSaved={editingCustomer ? handleUpdated : handleSaved}
                 />
             )}
         </div>
