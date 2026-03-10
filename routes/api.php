@@ -52,6 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bills/{bill}',     [BillingController::class, 'show']);
     Route::post('/bills/{bill}/coins',    [BillingController::class, 'addCoins']);
     Route::post('/bills/{bill}/products', [BillingController::class, 'addProducts']);
+    Route::put('/bills/{bill}/people',    [BillingController::class, 'updatePeople']);
     Route::post('/bills/{bill}/close',    [BillingController::class, 'closeBill']);
     Route::delete('/bills/{bill}',  [BillingController::class, 'destroy']);
 

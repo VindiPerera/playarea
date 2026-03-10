@@ -22,9 +22,9 @@ function generateBarcodeDataUrl(text) {
     }
 }
 
-// ── Calculate entrance fee client-side (mirrors server logic) ─────────────────
-function calcEntranceFee(bill) {
-    if (!bill.started_at) return parseFloat(bill.entrance_fee) || 0;
+// ── Calculate per-person standard entrance fee (time-based) ─────────────────
+function calcStandardFeePerPerson(bill) {
+    if (!bill.started_at) return parseFloat(bill.entrance_base_price) || 0;
     const start = new Date(bill.started_at);
     const now   = new Date();
     const elapsed = Math.max(0, Math.floor((now - start) / 60000));
@@ -34,16 +34,19 @@ function calcEntranceFee(bill) {
     if (remaining <= 0) return cost;
 
     if (bill.entrance_stage1_duration && bill.entrance_stage1_price) {
-        cost += parseFloat(bill.entrance_stage1_price);
-        remaining -= bill.entrance_stage1_duration;
-    }
-    if (remaining <= 0) return cost;
-
-    if (bill.entrance_stage2_duration && bill.entrance_stage2_price && remaining > 0) {
-        const cycles = Math.ceil(remaining / bill.entrance_stage2_duration);
-        cost += parseFloat(bill.entrance_stage2_price) * cycles;
+        const cycles = Math.ceil(remaining / bill.entrance_stage1_duration);
+        cost += parseFloat(bill.entrance_stage1_price) * cycles;
     }
     return cost;
+}
+
+// ── Calculate total entrance fee (all people) ─────────────────────────────────
+function calcEntranceFee(bill) {
+    const standardCount = Math.max(0, parseInt(bill.people_standard ?? 1));
+    const above10Count  = Math.max(0, parseInt(bill.people_above10  ?? 0));
+    const above10Price  = parseFloat(bill.entrance_above10_price ?? 0);
+    const standardFee   = calcStandardFeePerPerson(bill);
+    return (standardFee * standardCount) + (above10Price * above10Count);
 }
 
 // ── Get entrance stage label ──────────────────────────────────────────────────
@@ -55,8 +58,8 @@ function getEntranceStage(bill) {
 
     if (elapsed <= (bill.entrance_base_duration || 0)) return { label: 'Base', color: 'bg-green-100 text-green-800' };
     const afterBase = elapsed - (bill.entrance_base_duration || 0);
-    if (bill.entrance_stage1_duration && afterBase <= bill.entrance_stage1_duration) return { label: '1st Stage', color: 'bg-amber-100 text-amber-800' };
-    return { label: '2nd Stage', color: 'bg-red-100 text-red-800' };
+    if (bill.entrance_stage1_duration && afterBase > 0) return { label: '1st Stage', color: 'bg-amber-100 text-amber-800' };
+    return { label: 'Overtime', color: 'bg-red-100 text-red-800' };
 }
 
 // ── Format elapsed time ───────────────────────────────────────────────────────
@@ -74,9 +77,12 @@ function formatElapsed(startedAt) {
 function printEntranceReceipt(bill) {
     const win = window.open('', '_blank', 'width=800,height=900');
     const barcodeDataUrl = generateBarcodeDataUrl(bill.bill_number);
-    const basePrice = parseFloat(bill.entrance_base_price || 0);
-    const baseDuration = bill.entrance_base_duration || 0;
-    const startTime = bill.started_at ? new Date(bill.started_at).toLocaleString() : new Date().toLocaleString();
+    const basePrice      = parseFloat(bill.entrance_base_price || 0);
+    const baseDuration   = bill.entrance_base_duration || 0;
+    const above10Price   = parseFloat(bill.entrance_above10_price || 0);
+    const peopleStandard = Math.max(0, parseInt(bill.people_standard ?? 1));
+    const peopleAbove10  = Math.max(0, parseInt(bill.people_above10  ?? 0));
+    const startTime      = bill.started_at ? new Date(bill.started_at).toLocaleString() : new Date().toLocaleString();
 
     win.document.write(`
         <html>
@@ -125,31 +131,38 @@ function printEntranceReceipt(bill) {
 
             <p class="section-title">Entrance Fee Details</p>
             <div class="detail-row">
-                <span class="detail-label">Base Price</span>
-                <span class="detail-value">LKR ${basePrice.toFixed(2)}</span>
+                <span class="detail-label">Started At</span>
+                <span class="detail-value">${startTime}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Base Duration</span>
                 <span class="detail-value">${baseDuration} mins</span>
             </div>
-            <div class="detail-row">
-                <span class="detail-label">Started At</span>
-                <span class="detail-value">${startTime}</span>
-            </div>
 
-            ${bill.entrance_stage1_price || bill.entrance_stage2_price ? `
+            ${bill.entrance_stage1_price ? `
             <div class="tier-info">
-                <p style="font-weight:bold; margin-bottom:4px;">Pricing Tiers</p>
+                <p style="font-weight:bold; margin-bottom:4px;">Pricing Tiers (Standard)</p>
                 <div class="tier-row">• Base: LKR ${basePrice.toFixed(2)} for first ${baseDuration} mins</div>
-                ${bill.entrance_stage1_price ? `<div class="tier-row">• 1st Stage: +LKR ${parseFloat(bill.entrance_stage1_price).toFixed(2)} after ${baseDuration} mins (${bill.entrance_stage1_duration} min window)</div>` : ''}
-                ${bill.entrance_stage2_price ? `<div class="tier-row">• 2nd Stage: +LKR ${parseFloat(bill.entrance_stage2_price).toFixed(2)} every ${bill.entrance_stage2_duration} mins (recurring)</div>` : ''}
+                <div class="tier-row">• 1st Stage (Recurring): +LKR ${parseFloat(bill.entrance_stage1_price).toFixed(2)} every ${bill.entrance_stage1_duration} mins</div>
             </div>
             ` : ''}
 
+            <p class="section-title" style="margin-top:10px;">People</p>
+            ${peopleStandard > 0 ? `
+            <div class="detail-row">
+                <span class="detail-label">Standard</span>
+                <span class="detail-value">${peopleStandard} person${peopleStandard !== 1 ? 's' : ''} @ LKR ${basePrice.toFixed(2)} base</span>
+            </div>` : ''}
+            ${peopleAbove10 > 0 ? `
+            <div class="detail-row">
+                <span class="detail-label">Above Age 10</span>
+                <span class="detail-value">${peopleAbove10} person${peopleAbove10 !== 1 ? 's' : ''} @ LKR ${above10Price.toFixed(2)} flat</span>
+            </div>` : ''}
+
             <div class="total-section">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span class="total-label">Entrance Fee</span>
-                    <span class="total-amount">LKR ${basePrice.toFixed(2)}</span>
+                    <span class="total-label">Base Entrance Fee</span>
+                    <span class="total-amount">LKR ${(basePrice * peopleStandard + above10Price * peopleAbove10).toFixed(2)}</span>
                 </div>
             </div>
 
@@ -285,6 +298,8 @@ function printFinalBill(bill) {
     const coinTotal    = coinItems.reduce((s, i) => s + parseFloat(i.subtotal), 0);
     const productTotal = productItems.reduce((s, i) => s + parseFloat(i.subtotal), 0);
     const entranceFee  = parseFloat(bill.entrance_fee) || 0;
+    const peopleStandard = Math.max(0, parseInt(bill.people_standard ?? 1));
+    const peopleAbove10  = Math.max(0, parseInt(bill.people_above10  ?? 0));
 
     // Calculate elapsed duration for entrance
     let entranceDuration = 0;
@@ -356,14 +371,20 @@ function printFinalBill(bill) {
 
             ${entranceFee > 0 ? `
             <p class="section-title">Entrance Fee</p>
+            ${peopleStandard > 0 ? `
             <div class="subtotal-row">
-                <span>Entrance (${entranceDuration} mins)</span>
-                <span style="font-weight:bold;">LKR ${entranceFee.toFixed(2)}</span>
-            </div>
+                <span>Standard × ${peopleStandard} (${entranceDuration} mins)</span>
+                <span style="font-weight:bold;">LKR ${(entranceFee - parseFloat(bill.entrance_above10_price || 0) * peopleAbove10).toFixed(2)}</span>
+            </div>` : ''}
+            ${peopleAbove10 > 0 ? `
+            <div class="subtotal-row">
+                <span>Above Age 10 × ${peopleAbove10} (flat)</span>
+                <span style="font-weight:bold;">LKR ${(parseFloat(bill.entrance_above10_price || 0) * peopleAbove10).toFixed(2)}</span>
+            </div>` : ''}
             <div style="font-size:11px; color:#000; margin-top:2px;">
                 Base: LKR ${parseFloat(bill.entrance_base_price || 0).toFixed(2)} (${bill.entrance_base_duration || 0} mins)
-                ${bill.entrance_stage1_price ? ` | 1st: +LKR ${parseFloat(bill.entrance_stage1_price).toFixed(2)} (${bill.entrance_stage1_duration}m)` : ''}
-                ${bill.entrance_stage2_price ? ` | 2nd: +LKR ${parseFloat(bill.entrance_stage2_price).toFixed(2)} (every ${bill.entrance_stage2_duration}m)` : ''}
+                ${bill.entrance_stage1_price ? ` | 1st (recurring): +LKR ${parseFloat(bill.entrance_stage1_price).toFixed(2)} every ${bill.entrance_stage1_duration}m` : ''}
+                ${bill.entrance_above10_price ? ` | Above-10 flat: LKR ${parseFloat(bill.entrance_above10_price).toFixed(2)}` : ''}
             </div>
             ` : ''}
 
@@ -498,6 +519,10 @@ export default function Billing() {
     const [customerForm, setCustomerForm]         = useState({ name: '', phone: '' });
     const [customerError, setCustomerError]       = useState('');
 
+    // People counts for new bill
+    const [peopleStandard, setPeopleStandard] = useState(1);
+    const [peopleAbove10,  setPeopleAbove10]  = useState(0);
+
     // Bill search
     const [billSearch, setBillSearch] = useState('');
     const billSearchRef = useRef(null);
@@ -604,7 +629,11 @@ export default function Billing() {
             const res = await fetch('/api/bills/open', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ customer_id: selectedCustomer?.id || null }),
+                body: JSON.stringify({
+                    customer_id:     selectedCustomer?.id || null,
+                    people_standard: peopleStandard,
+                    people_above10:  peopleAbove10,
+                }),
             });
             const data = await res.json();
             if (!res.ok) { setError(data.message ?? 'Failed to open bill.'); }
@@ -613,6 +642,8 @@ export default function Billing() {
                 setActiveBill(data);
                 setSelectedCustomer(null);
                 setCustomerSearch('');
+                setPeopleStandard(1);
+                setPeopleAbove10(0);
                 await fetchData();
             }
         } catch (_) { setError('Network error.'); }
@@ -710,6 +741,23 @@ export default function Billing() {
             }
         } catch (_) { setError('Network error.'); }
         finally { setLoading(false); }
+    };
+
+    // Update people counts on active open bill
+    const handleUpdatePeople = async (newStandard, newAbove10) => {
+        if (!activeBill) return;
+        try {
+            const res = await fetch(`/api/bills/${activeBill.id}/people`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ people_standard: newStandard, people_above10: newAbove10 }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setActiveBill(data);
+                await fetchData();
+            }
+        } catch (_) {}
     };
 
     // Close bill
@@ -919,11 +967,47 @@ export default function Billing() {
                                         </div>
                                     )}
 
+                                    {/* People Selector */}
+                                    <div className="border border-gray-200 rounded-xl p-4 mb-3 bg-gray-50 space-y-3">
+                                        <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">People</p>
+                                        {/* Standard */}
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-800">Standard</p>
+                                                <p className="text-xs text-gray-400">Time-based entrance fee</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => setPeopleStandard(p => Math.max(0, p - 1))}
+                                                    className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm flex items-center justify-center transition">−</button>
+                                                <span className="w-6 text-center font-bold text-gray-800">{peopleStandard}</span>
+                                                <button onClick={() => setPeopleStandard(p => p + 1)}
+                                                    className="w-7 h-7 rounded-full bg-[#1a237e] hover:bg-[#0d1654] text-white font-bold text-sm flex items-center justify-center transition">+</button>
+                                            </div>
+                                        </div>
+                                        {/* Above 10 */}
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-800">Above Age 10</p>
+                                                <p className="text-xs text-gray-400">Flat entrance fee</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => setPeopleAbove10(p => Math.max(0, p - 1))}
+                                                    className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm flex items-center justify-center transition">−</button>
+                                                <span className="w-6 text-center font-bold text-gray-800">{peopleAbove10}</span>
+                                                <button onClick={() => setPeopleAbove10(p => p + 1)}
+                                                    className="w-7 h-7 rounded-full bg-[#1a237e] hover:bg-[#0d1654] text-white font-bold text-sm flex items-center justify-center transition">+</button>
+                                            </div>
+                                        </div>
+                                        {(peopleStandard + peopleAbove10) === 0 && (
+                                            <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">Add at least one person.</p>
+                                        )}
+                                    </div>
+
                                     {error && <p className="text-xs text-red-600 bg-red-50 rounded-xl px-4 py-3 border border-red-200 mb-3">{error}</p>}
 
-                                    <button onClick={handleOpenBill} disabled={loading}
+                                    <button onClick={handleOpenBill} disabled={loading || (peopleStandard + peopleAbove10) === 0}
                                         className="w-full bg-gray-900 hover:bg-gray-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white rounded-2xl py-4 text-sm font-extrabold uppercase tracking-widest transition">
-                                        {loading ? 'Opening…' : 'Open New Bill'}
+                                        {loading ? 'Opening…' : `Open Bill — ${peopleStandard + peopleAbove10} Person${(peopleStandard + peopleAbove10) !== 1 ? 's' : ''}`}
                                     </button>
                                 </div>
                             </div>
@@ -960,7 +1044,9 @@ export default function Billing() {
                                                     </div>
                                                 )}
                                                 <div className="mt-2 flex items-center justify-between">
-                                                    <span className="text-xs text-gray-400">{bill.items.length} coin(s)</span>
+                                                    <span className="text-xs text-gray-400">
+                                                        👤 {(bill.people_standard || 1) + (bill.people_above10 || 0)} person(s) · {bill.items.length} item(s)
+                                                    </span>
                                                     <span className="text-sm font-bold text-gray-800">LKR {(fee + bill.items.reduce((s, i) => s + parseFloat(i.subtotal), 0)).toFixed(2)}</span>
                                                 </div>
                                             </div>
@@ -993,6 +1079,54 @@ export default function Billing() {
                                 </div>
                             </div>
 
+                            {/* People Management (open bills) */}
+                            {activeBill.status === 'open' && (
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="px-5 py-4 bg-[#1a237e]">
+                                        <p className="text-white font-bold text-sm uppercase tracking-wider">People on This Bill</p>
+                                        <p className="text-blue-300 text-xs mt-0.5">Adjust headcount — entrance fee updates live</p>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        {/* Standard */}
+                                        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-800">Standard</p>
+                                                <p className="text-xs text-gray-400">Time-based • LKR {calcStandardFeePerPerson(activeBill).toFixed(2)} / person</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => {
+                                                    const n = Math.max(0, (activeBill.people_standard || 1) - 1);
+                                                    handleUpdatePeople(n, activeBill.people_above10 || 0);
+                                                }} className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm flex items-center justify-center transition">−</button>
+                                                <span className="w-6 text-center font-bold text-gray-800">{activeBill.people_standard ?? 1}</span>
+                                                <button onClick={() => {
+                                                    const n = (activeBill.people_standard || 1) + 1;
+                                                    handleUpdatePeople(n, activeBill.people_above10 || 0);
+                                                }} className="w-7 h-7 rounded-full bg-[#1a237e] hover:bg-[#0d1654] text-white font-bold text-sm flex items-center justify-center transition">+</button>
+                                            </div>
+                                        </div>
+                                        {/* Above 10 */}
+                                        <div className="flex items-center justify-between bg-blue-50 rounded-xl px-4 py-3">
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-800">Above Age 10</p>
+                                                <p className="text-xs text-gray-400">Flat rate • LKR {parseFloat(activeBill.entrance_above10_price || 0).toFixed(2)} / person</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => {
+                                                    const n = Math.max(0, (activeBill.people_above10 || 0) - 1);
+                                                    handleUpdatePeople(activeBill.people_standard || 1, n);
+                                                }} className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm flex items-center justify-center transition">−</button>
+                                                <span className="w-6 text-center font-bold text-gray-800">{activeBill.people_above10 ?? 0}</span>
+                                                <button onClick={() => {
+                                                    const n = (activeBill.people_above10 || 0) + 1;
+                                                    handleUpdatePeople(activeBill.people_standard || 1, n);
+                                                }} className="w-7 h-7 rounded-full bg-[#1a237e] hover:bg-[#0d1654] text-white font-bold text-sm flex items-center justify-center transition">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Entrance Fee Timer */}
                             {activeBill.started_at && activeBill.status === 'open' && (
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1021,8 +1155,7 @@ export default function Billing() {
                                         </div>
                                         <div className="text-xs text-gray-400 bg-gray-50 rounded-xl px-4 py-2">
                                             Base: LKR {parseFloat(activeBill.entrance_base_price || 0).toFixed(2)} ({activeBill.entrance_base_duration || 0}m)
-                                            {activeBill.entrance_stage1_price && ` → 1st: +LKR ${parseFloat(activeBill.entrance_stage1_price).toFixed(2)} (${activeBill.entrance_stage1_duration}m)`}
-                                            {activeBill.entrance_stage2_price && ` → 2nd: +LKR ${parseFloat(activeBill.entrance_stage2_price).toFixed(2)} (every ${activeBill.entrance_stage2_duration}m)`}
+                                            {activeBill.entrance_stage1_price && ` → 1st (recurring): +LKR ${parseFloat(activeBill.entrance_stage1_price).toFixed(2)} every ${activeBill.entrance_stage1_duration}m`}
                                         </div>
                                     </div>
                                 </div>
@@ -1177,19 +1310,37 @@ export default function Billing() {
                                 </div>
                                 <div className="p-4 space-y-3 min-h-[120px]">
 
-                                    {/* Entrance Fee */}
-                                    {liveEntranceFee > 0 && (
-                                        <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
-                                            <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-sm flex-shrink-0 text-white">⏱</div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold text-gray-800">Entrance Fee</p>
-                                                {activeBill.started_at && activeBill.status === 'open' && (
-                                                    <p className="text-xs text-gray-400">{formatElapsed(activeBill.started_at)}</p>
+                                    {/* Entrance Fee — broken down by people type */}
+                                    {liveEntranceFee > 0 && (() => {
+                                        const stdCount    = Math.max(0, parseInt(activeBill.people_standard ?? 1));
+                                        const a10Count    = Math.max(0, parseInt(activeBill.people_above10  ?? 0));
+                                        const stdFee      = calcStandardFeePerPerson(activeBill);
+                                        const a10Price    = parseFloat(activeBill.entrance_above10_price ?? 0);
+                                        return (
+                                            <>
+                                                {stdCount > 0 && (
+                                                    <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                                                        <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-sm flex-shrink-0 text-white">⏱</div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs font-bold text-gray-800">Entrance × {stdCount}</p>
+                                                            <p className="text-xs text-gray-400">{activeBill.started_at && activeBill.status === 'open' ? formatElapsed(activeBill.started_at) : `LKR ${stdFee.toFixed(2)} ea`}</p>
+                                                        </div>
+                                                        <p className="text-sm font-extrabold text-gray-900">LKR {(stdFee * stdCount).toFixed(2)}</p>
+                                                    </div>
                                                 )}
-                                            </div>
-                                            <p className="text-sm font-extrabold text-gray-900">LKR {liveEntranceFee.toFixed(2)}</p>
-                                        </div>
-                                    )}
+                                                {a10Count > 0 && (
+                                                    <div className="flex items-center gap-3 bg-blue-50 rounded-xl px-3 py-2.5">
+                                                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm flex-shrink-0 text-white">🎟</div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs font-bold text-gray-800">Above 10 × {a10Count}</p>
+                                                            <p className="text-xs text-gray-400">LKR {a10Price.toFixed(2)} flat ea</p>
+                                                        </div>
+                                                        <p className="text-sm font-extrabold text-gray-900">LKR {(a10Price * a10Count).toFixed(2)}</p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
 
                                     {/* Coin Items */}
                                     {activeBill.items.map(item => (

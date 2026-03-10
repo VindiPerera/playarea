@@ -11,8 +11,7 @@ export default function Settings() {
         entrance_base_duration: '',
         entrance_stage1_price: '',
         entrance_stage1_duration: '',
-        entrance_stage2_price: '',
-        entrance_stage2_duration: '',
+        entrance_above10_price: ''
     });
     const [loading, setLoading]             = useState(true);
     const [saving, setSaving]               = useState(false);
@@ -31,8 +30,7 @@ export default function Settings() {
                     entrance_base_duration: data.entrance_base_duration ?? '0',
                     entrance_stage1_price: data.entrance_stage1_price ?? '',
                     entrance_stage1_duration: data.entrance_stage1_duration ?? '',
-                    entrance_stage2_price: data.entrance_stage2_price ?? '',
-                    entrance_stage2_duration: data.entrance_stage2_duration ?? '',
+                    entrance_above10_price: data.entrance_above10_price ?? ''
                 });
             })
             .catch(() => {})
@@ -122,7 +120,7 @@ export default function Settings() {
                                 {/* Stage 1 */}
                                 <div>
                                     <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-amber-500"></span> 1st Stage (Optional)
+                                        <span className="w-2 h-2 rounded-full bg-amber-500"></span> 1st Stage — Recurring (Optional)
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -135,9 +133,9 @@ export default function Settings() {
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">Duration (mins)</label>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Every (mins)</label>
                                             <input type="number" min="1" value={form.entrance_stage1_duration}
-                                                onChange={e => handleChange('entrance_stage1_duration', e.target.value)} placeholder="15"
+                                                onChange={e => handleChange('entrance_stage1_duration', e.target.value)} placeholder="10"
                                                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 transition" />
                                         </div>
                                     </div>
@@ -145,26 +143,19 @@ export default function Settings() {
 
                                 <div className="border-t border-gray-100"></div>
 
-                                {/* Stage 2 */}
+                                {/* Above Age 10 */}
                                 <div>
-                                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-red-500"></span> 2nd Stage — Recurring (Optional)
+                                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-1 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-blue-500"></span> Above Age 10 Entrance Fee
                                     </p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">Extra Price (LKR)</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-semibold">LKR</span>
-                                                <input type="number" min="0" step="0.01" value={form.entrance_stage2_price}
-                                                    onChange={e => handleChange('entrance_stage2_price', e.target.value)} placeholder="0.00"
-                                                    className="w-full border border-gray-300 rounded-lg pl-12 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 transition" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">Every (mins)</label>
-                                            <input type="number" min="1" value={form.entrance_stage2_duration}
-                                                onChange={e => handleChange('entrance_stage2_duration', e.target.value)} placeholder="10"
-                                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 transition" />
+                                    <p className="text-xs text-gray-400 mb-3">Flat rate — no time stages. Applied per person over age 10.</p>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Price (LKR)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-semibold">LKR</span>
+                                            <input type="number" min="0" step="0.01" value={form.entrance_above10_price}
+                                                onChange={e => handleChange('entrance_above10_price', e.target.value)} placeholder="0.00"
+                                                className="w-full border border-gray-300 rounded-lg pl-12 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition" />
                                         </div>
                                     </div>
                                 </div>

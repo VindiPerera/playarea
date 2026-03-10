@@ -31,7 +31,9 @@ class BillingController extends Controller
     public function openBill(Request $request)
     {
         $request->validate([
-            'customer_id' => 'nullable|exists:customers,id',
+            'customer_id'     => 'nullable|exists:customers,id',
+            'people_standard' => 'nullable|integer|min:0',
+            'people_above10'  => 'nullable|integer|min:0',
         ]);
 
         // Snapshot entrance fee tier pricing from settings
@@ -40,8 +42,10 @@ class BillingController extends Controller
         $baseDuration  = intval($settings['entrance_base_duration'] ?? 0);
         $stage1Price   = $settings['entrance_stage1_price'] ?? null;
         $stage1Dur     = $settings['entrance_stage1_duration'] ?? null;
-        $stage2Price   = $settings['entrance_stage2_price'] ?? null;
-        $stage2Dur     = $settings['entrance_stage2_duration'] ?? null;
+        $above10Price  = $settings['entrance_above10_price'] ?? null;
+
+        $peopleStandard = max(0, intval($request->people_standard ?? 1));
+        $peopleAbove10  = max(0, intval($request->people_above10  ?? 0));
 
         $billNumber = $this->generateBillNumber();
 
@@ -54,17 +58,42 @@ class BillingController extends Controller
             'payment_method'          => null,
             'cash_amount'             => null,
             'started_at'              => now(),
+            'people_standard'         => $peopleStandard,
+            'people_above10'          => $peopleAbove10,
             'entrance_base_price'     => $basePrice,
             'entrance_base_duration'  => $baseDuration,
             'entrance_stage1_price'   => $stage1Price,
             'entrance_stage1_duration'=> $stage1Dur,
-            'entrance_stage2_price'   => $stage2Price,
-            'entrance_stage2_duration'=> $stage2Dur,
+            'entrance_above10_price'  => $above10Price,
         ]);
 
         $this->recalculateTotal($bill);
 
         return response()->json($bill->load(['items', 'customer']), 201);
+    }
+
+    /**
+     * Update people counts on an open bill.
+     */
+    public function updatePeople(Request $request, Bill $bill)
+    {
+        if ($bill->status !== 'open') {
+            return response()->json(['message' => 'Bill is already closed.'], 422);
+        }
+
+        $request->validate([
+            'people_standard' => 'required|integer|min:0',
+            'people_above10'  => 'required|integer|min:0',
+        ]);
+
+        $bill->update([
+            'people_standard' => $request->people_standard,
+            'people_above10'  => $request->people_above10,
+        ]);
+
+        $this->recalculateTotal($bill);
+
+        return response()->json($bill->load(['items', 'customer']));
     }
 
     /**
@@ -229,30 +258,23 @@ class BillingController extends Controller
         $end   = now();
         $elapsedMinutes = max(0, $start->diffInMinutes($end));
 
-        $cost = $bill->entrance_base_price;
-        $remaining = $elapsedMinutes - $bill->entrance_base_duration;
+        // --- Standard (time-based) fee per person ---
+        $cost = floatval($bill->entrance_base_price);
+        $remaining = $elapsedMinutes - intval($bill->entrance_base_duration);
 
-        if ($remaining <= 0) {
-            return $cost;
+        if ($remaining > 0) {
+            // Stage 1 — Recurring
+            if ($bill->entrance_stage1_duration && $bill->entrance_stage1_price) {
+                $stage1Cycles = ceil($remaining / $bill->entrance_stage1_duration);
+                $cost += floatval($bill->entrance_stage1_price) * $stage1Cycles;
+            }
         }
 
-        // Stage 1
-        if ($bill->entrance_stage1_duration && $bill->entrance_stage1_price) {
-            $cost += $bill->entrance_stage1_price;
-            $remaining -= $bill->entrance_stage1_duration;
-        }
+        $standardCount = max(0, intval($bill->people_standard ?? 1));
+        $above10Count  = max(0, intval($bill->people_above10  ?? 0));
+        $above10Price  = floatval($bill->entrance_above10_price ?? 0);
 
-        if ($remaining <= 0) {
-            return $cost;
-        }
-
-        // Stage 2 (recurring)
-        if ($bill->entrance_stage2_duration && $bill->entrance_stage2_price && $remaining > 0) {
-            $stage2Cycles = ceil($remaining / $bill->entrance_stage2_duration);
-            $cost += $bill->entrance_stage2_price * $stage2Cycles;
-        }
-
-        return $cost;
+        return ($cost * $standardCount) + ($above10Price * $above10Count);
     }
 
     /**

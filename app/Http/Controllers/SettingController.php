@@ -20,8 +20,7 @@ class SettingController extends Controller
             'entrance_base_duration'  => 'required|integer|min:1',
             'entrance_stage1_price'   => 'nullable|numeric|min:0',
             'entrance_stage1_duration'=> 'nullable|integer|min:1',
-            'entrance_stage2_price'   => 'nullable|numeric|min:0',
-            'entrance_stage2_duration'=> 'nullable|integer|min:1',
+            'entrance_above10_price'  => 'nullable|numeric|min:0',
         ]);
 
         $keys = [
@@ -29,8 +28,7 @@ class SettingController extends Controller
             'entrance_base_duration',
             'entrance_stage1_price',
             'entrance_stage1_duration',
-            'entrance_stage2_price',
-            'entrance_stage2_duration',
+            'entrance_above10_price',
         ];
 
         foreach ($keys as $key) {
