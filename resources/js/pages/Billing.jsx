@@ -279,8 +279,12 @@ function printCoinReceipt(bill, coinItems) {
 function printFinalBill(bill) {
     const win = window.open('', '_blank', 'width=800,height=900');
     const barcodeDataUrl = generateBarcodeDataUrl(bill.bill_number);
-    const coinTotal   = bill.items.reduce((s, i) => s + parseFloat(i.subtotal), 0);
-    const entranceFee = parseFloat(bill.entrance_fee) || 0;
+    const allItems     = bill.items ?? [];
+    const coinItems    = allItems.filter(i => i.item_type !== 'product');
+    const productItems = allItems.filter(i => i.item_type === 'product');
+    const coinTotal    = coinItems.reduce((s, i) => s + parseFloat(i.subtotal), 0);
+    const productTotal = productItems.reduce((s, i) => s + parseFloat(i.subtotal), 0);
+    const entranceFee  = parseFloat(bill.entrance_fee) || 0;
 
     // Calculate elapsed duration for entrance
     let entranceDuration = 0;
@@ -363,7 +367,7 @@ function printFinalBill(bill) {
             </div>
             ` : ''}
 
-            ${bill.items.length > 0 ? `
+            ${coinItems.length > 0 ? `
             <p class="section-title">Coins</p>
             <table>
                 <thead><tr>
@@ -373,7 +377,7 @@ function printFinalBill(bill) {
                     <th style="text-align:right;">Subtotal</th>
                 </tr></thead>
                 <tbody>
-                    ${bill.items.map(item => `
+                    ${coinItems.map(item => `
                         <tr class="item-row">
                             <td class="item-name">${item.coin_name}</td>
                             <td class="item-detail" style="text-align:center;">x${item.quantity}</td>
@@ -386,6 +390,32 @@ function printFinalBill(bill) {
             <div class="subtotal-row" style="font-weight:bold; margin-top:5px;">
                 <span>Coins Subtotal</span>
                 <span>LKR ${coinTotal.toFixed(2)}</span>
+            </div>
+            ` : ''}
+
+            ${productItems.length > 0 ? `
+            <p class="section-title">Products</p>
+            <table>
+                <thead><tr>
+                    <th style="text-align:left;">Item</th>
+                    <th style="text-align:center;">Qty</th>
+                    <th style="text-align:right;">Price</th>
+                    <th style="text-align:right;">Subtotal</th>
+                </tr></thead>
+                <tbody>
+                    ${productItems.map(item => `
+                        <tr class="item-row">
+                            <td class="item-name">${item.coin_name}${item.discount > 0 ? ` <span style="font-size:10px;color:#555;">(${item.discount}% off)</span>` : ''}</td>
+                            <td class="item-detail" style="text-align:center;">x${item.quantity}</td>
+                            <td class="item-detail" style="text-align:right;">LKR ${parseFloat(item.coin_price).toFixed(2)}</td>
+                            <td class="item-detail" style="text-align:right;font-weight:bold;">LKR ${parseFloat(item.subtotal).toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div class="subtotal-row" style="font-weight:bold; margin-top:5px;">
+                <span>Products Subtotal</span>
+                <span>LKR ${productTotal.toFixed(2)}</span>
             </div>
             ` : ''}
 
@@ -445,11 +475,15 @@ export default function Billing() {
 
     // Data
     const [coins, setCoins]           = useState([]);
+    const [products, setProducts]     = useState([]);
     const [openBills, setOpenBills]   = useState([]);
     const [activeBill, setActiveBill] = useState(null);
 
     // Coin selection for active bill
     const [selections, setSelections] = useState({});
+
+    // Product selection for active bill
+    const [productSelections, setProductSelections] = useState({});
 
     // Payment
     const [payMethod, setPayMethod]   = useState('cash');
@@ -528,6 +562,13 @@ export default function Billing() {
             const [coinsData, billsData] = await Promise.all([coinsRes.json(), billsRes.json()]);
             setCoins(Array.isArray(coinsData) ? coinsData : []);
             setOpenBills(Array.isArray(billsData) ? billsData : []);
+
+            // Also fetch products
+            try {
+                const prodRes  = await fetch('/api/products', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+                const prodData = await prodRes.json();
+                setProducts(Array.isArray(prodData) ? prodData : []);
+            } catch (_) {}
 
             if (activeBill) {
                 const updated = (Array.isArray(billsData) ? billsData : []).find(b => b.id === activeBill.id);
@@ -617,6 +658,54 @@ export default function Billing() {
             else {
                 setActiveBill(data);
                 setSelections({});
+                await fetchData();
+            }
+        } catch (_) { setError('Network error.'); }
+        finally { setLoading(false); }
+    };
+
+    // Add products to active bill
+    const selectedProductItems = Object.values(productSelections);
+    const productTotal = selectedProductItems.reduce((s, { product, qty }) => {
+        const disc = parseFloat(product.discount) || 0;
+        return s + parseFloat(product.sell_price) * (1 - disc / 100) * qty;
+    }, 0);
+
+    const toggleProduct = (product) => {
+        setProductSelections(prev => {
+            const copy = { ...prev };
+            if (copy[product.id]) delete copy[product.id];
+            else copy[product.id] = { product, qty: 1 };
+            return copy;
+        });
+    };
+
+    const setProductQty = (productId, delta) => {
+        setProductSelections(prev => {
+            const cur  = prev[productId]?.qty ?? 1;
+            const next = Math.max(1, cur + delta);
+            return { ...prev, [productId]: { ...prev[productId], qty: next } };
+        });
+    };
+
+    const handleAddProducts = async () => {
+        if (!activeBill || selectedProductItems.length === 0) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const items = selectedProductItems.map(({ product, qty }) => ({
+                product_id: product.id, quantity: qty,
+            }));
+            const res = await fetch(`/api/bills/${activeBill.id}/products`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ items }),
+            });
+            const data = await res.json();
+            if (!res.ok) { setError(data.message ?? 'Failed to add products.'); }
+            else {
+                setActiveBill(data);
+                setProductSelections({});
                 await fetchData();
             }
         } catch (_) { setError('Network error.'); }
@@ -1002,6 +1091,80 @@ export default function Billing() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Products Grid (only for open bills) */}
+                            {activeBill.status === 'open' && (
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="px-5 py-4 bg-[#00695c]">
+                                        <p className="text-white font-bold text-sm uppercase tracking-wider">Available Products</p>
+                                        <p className="text-teal-200 text-xs mt-0.5">Select products to add to the bill</p>
+                                    </div>
+                                    <div className="p-5">
+                                        {products.length === 0 ? (
+                                            <p className="text-sm text-gray-400 text-center py-10">No products found. Add some products first.</p>
+                                        ) : (
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                                {products.map(product => {
+                                                    const sel      = productSelections[product.id];
+                                                    const disc     = parseFloat(product.discount) || 0;
+                                                    const effPrice = parseFloat(product.sell_price) * (1 - disc / 100);
+                                                    return (
+                                                        <div key={product.id} onClick={() => toggleProduct(product)}
+                                                            className={`relative rounded-2xl border-2 cursor-pointer transition-all select-none overflow-hidden
+                                                                ${sel ? 'border-[#00695c] shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'}`}>
+                                                            {sel && (
+                                                                <div className="absolute top-2 right-2 w-5 h-5 bg-[#00695c] rounded-full flex items-center justify-center z-10">
+                                                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/>
+                                                                    </svg>
+                                                                </div>
+                                                            )}
+                                                            <div className={`flex flex-col items-center pt-5 pb-3 px-3 ${sel ? 'bg-teal-50' : 'bg-gray-50'}`}>
+                                                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-2xl shadow-md mb-2">📦</div>
+                                                                <p className="font-bold text-gray-800 text-sm text-center leading-tight">{product.name}</p>
+                                                                {disc > 0 ? (
+                                                                    <div className="text-center mt-1">
+                                                                        <span className="text-xs line-through text-gray-400">LKR {parseFloat(product.sell_price).toFixed(2)}</span>
+                                                                        <span className="ml-1 text-xs font-bold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full">{disc}% OFF</span>
+                                                                        <p className="text-xs font-semibold text-[#00695c] mt-0.5">LKR {effPrice.toFixed(2)}</p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-xs font-semibold text-[#00695c] mt-1">LKR {effPrice.toFixed(2)}</p>
+                                                                )}
+                                                            </div>
+                                                            {sel ? (
+                                                                <div className="flex items-center justify-center gap-3 bg-[#00695c] py-2" onClick={e => e.stopPropagation()}>
+                                                                    <button onClick={() => setProductQty(product.id, -1)}
+                                                                        className="w-6 h-6 rounded-full bg-white text-[#00695c] font-bold text-sm flex items-center justify-center hover:bg-teal-100 transition">−</button>
+                                                                    <span className="text-white font-bold text-sm w-5 text-center">{sel.qty}</span>
+                                                                    <button onClick={() => setProductQty(product.id, +1)}
+                                                                        className="w-6 h-6 rounded-full bg-white text-[#00695c] font-bold text-sm flex items-center justify-center hover:bg-teal-100 transition">+</button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center justify-center bg-gray-100 py-2">
+                                                                    <span className="text-xs text-gray-400">Tap to add</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {selectedProductItems.length > 0 && (
+                                            <div className="mt-4 flex justify-end">
+                                                <button onClick={handleAddProducts} disabled={loading}
+                                                    className="bg-[#00695c] hover:bg-[#004d40] disabled:bg-gray-300 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                    </svg>
+                                                    Add Products (LKR {productTotal.toFixed(2)})
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* ── RIGHT: Bill Summary ─── */}
@@ -1031,10 +1194,12 @@ export default function Billing() {
                                     {/* Coin Items */}
                                     {activeBill.items.map(item => (
                                         <div key={item.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-sm flex-shrink-0">🪙</div>
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${item.item_type === 'product' ? 'bg-gradient-to-br from-teal-400 to-emerald-500' : 'bg-gradient-to-br from-yellow-300 to-yellow-500'}`}>
+                                                {item.item_type === 'product' ? '📦' : '🪙'}
+                                            </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-bold text-gray-800 truncate">{item.coin_name}</p>
-                                                <p className="text-xs text-gray-400">LKR {parseFloat(item.coin_price).toFixed(2)} × {item.quantity}</p>
+                                                <p className="text-xs text-gray-400">LKR {parseFloat(item.coin_price).toFixed(2)} × {item.quantity}{item.discount > 0 ? ` (${item.discount}% off)` : ''}</p>
                                             </div>
                                             <p className="text-sm font-extrabold text-gray-900">LKR {parseFloat(item.subtotal).toFixed(2)}</p>
                                         </div>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bill;
+use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 
@@ -123,6 +124,42 @@ class BillingController extends Controller
             'payment_method' => $request->payment_method,
             'cash_amount'    => $request->payment_method === 'cash' ? $request->cash_amount : null,
         ]);
+
+        return response()->json($bill->load(['items', 'customer']));
+    }
+
+    /**
+     * Add product items to an open bill.
+     */
+    public function addProducts(Request $request, Bill $bill)
+    {
+        if ($bill->status !== 'open') {
+            return response()->json(['message' => 'Bill is already closed.'], 422);
+        }
+
+        $request->validate([
+            'items'                  => 'required|array|min:1',
+            'items.*.product_id'     => 'required|exists:products,id',
+            'items.*.quantity'       => 'required|integer|min:1',
+        ]);
+
+        foreach ($request->items as $item) {
+            $product = Product::findOrFail($item['product_id']);
+            $discount       = floatval($product->discount);
+            $effectivePrice = round($product->sell_price * (1 - $discount / 100), 2);
+
+            $bill->items()->create([
+                'item_type'  => 'product',
+                'product_id' => $product->id,
+                'coin_name'  => $product->name,   // stored for display / receipt
+                'coin_price' => $effectivePrice,  // price after discount
+                'discount'   => $discount,
+                'quantity'   => $item['quantity'],
+                'subtotal'   => $effectivePrice * $item['quantity'],
+            ]);
+        }
+
+        $this->recalculateTotal($bill);
 
         return response()->json($bill->load(['items', 'customer']));
     }

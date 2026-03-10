@@ -58,6 +58,15 @@ const IconSetting = () => (
     </svg>
 );
 
+const IconProduct = () => (
+    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12">
+        <path d="M10 20l22-12 22 12v24L32 56 10 44V20z"/>
+        <path d="M10 20l22 12 22-12"/>
+        <line x1="32" y1="32" x2="32" y2="56"/>
+        <path d="M21 14l22 12"/>
+    </svg>
+);
+
 // ── Dashboard cards config ─────────────────────────────────────────────────────
 const cards = [
   
@@ -77,6 +86,14 @@ const cards = [
         Icon:  IconCoin,
         bg:    '#6a1b9a',   // purple
         path:  '/coins',
+    },
+    {
+        key:   'products',
+        title: 'PRODUCTS',
+        desc:  'Add and manage products with cost price, sell price and discounts.',
+        Icon:  IconProduct,
+        bg:    '#00695c',   // teal
+        path:  '/products',
     },
       {
         key:   'games',

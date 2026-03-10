@@ -5,6 +5,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CoinController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingController;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/settings',         [SettingController::class, 'index']);
     Route::put('/settings',         [SettingController::class, 'update']);
 
+    // Products
+    Route::get('/products',              [ProductController::class, 'index']);
+    Route::post('/products',             [ProductController::class, 'store']);
+    Route::put('/products/{product}',    [ProductController::class, 'update']);
+    Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+
     // Billing
     Route::get('/bills',            [BillingController::class, 'index']);
     Route::get('/bills/open',       [BillingController::class, 'openBills']);
@@ -44,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/bills/open',      [BillingController::class, 'openBill']);
     Route::get('/bills/{bill}',     [BillingController::class, 'show']);
     Route::post('/bills/{bill}/coins',    [BillingController::class, 'addCoins']);
+    Route::post('/bills/{bill}/products', [BillingController::class, 'addProducts']);
     Route::post('/bills/{bill}/close',    [BillingController::class, 'closeBill']);
     Route::delete('/bills/{bill}',  [BillingController::class, 'destroy']);
 

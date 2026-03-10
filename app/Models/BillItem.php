@@ -6,5 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class BillItem extends Model
 {
-    protected $fillable = ['bill_id', 'coin_id', 'coin_name', 'coin_price', 'quantity', 'subtotal'];
+    protected $fillable = [
+        'bill_id', 'item_type',
+        'coin_id', 'coin_name', 'coin_price',
+        'product_id', 'discount',
+        'quantity', 'subtotal',
+    ];
 }
