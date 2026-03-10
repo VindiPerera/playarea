@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 
-// ── Add Coin Modal ────────────────────────────────────────────────────────────
-function AddCoinModal({ token, onClose, onSaved }) {
-    const [form,    setForm]    = useState({ name: '', price: '' });
+// ── Add / Edit Coin Modal ─────────────────────────────────────────────────────
+function CoinModal({ token, coin, onClose, onSaved }) {
+    const isEdit = !!coin;
+    const [form,    setForm]    = useState({ name: coin?.name ?? '', price: coin?.price ?? '' });
     const [errors,  setErrors]  = useState({});
     const [loading, setLoading] = useState(false);
 
@@ -17,8 +18,8 @@ function AddCoinModal({ token, onClose, onSaved }) {
         setErrors({});
         setLoading(true);
         try {
-            const res  = await fetch('/api/coins', {
-                method:  'POST',
+            const res = await fetch(isEdit ? `/api/coins/${coin.id}` : '/api/coins', {
+                method:  isEdit ? 'PUT' : 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Accept:         'application/json',
@@ -46,25 +47,16 @@ function AddCoinModal({ token, onClose, onSaved }) {
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-7">
-                {/* Header */}
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-bold text-gray-800">Add Coin</h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-                    >
-                        &times;
-                    </button>
+                    <h2 className="text-lg font-bold text-gray-800">{isEdit ? 'Edit Coin' : 'Add Coin'}</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
                 </div>
 
                 {errors.general && (
-                    <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                        {errors.general[0]}
-                    </p>
+                    <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{errors.general[0]}</p>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Coin Name */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Coin Name <span className="text-red-500">*</span>
@@ -80,15 +72,12 @@ function AddCoinModal({ token, onClose, onSaved }) {
                         {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name[0]}</p>}
                     </div>
 
-                    {/* Price */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Price (LKR) <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">
-                                LKR
-                            </span>
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">LKR</span>
                             <input
                                 name="price"
                                 type="number"
@@ -117,7 +106,7 @@ function AddCoinModal({ token, onClose, onSaved }) {
                             disabled={loading}
                             className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg py-2.5 text-sm font-semibold transition"
                         >
-                            {loading ? 'Saving…' : 'Add Coin'}
+                            {loading ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Coin'}
                         </button>
                     </div>
                 </form>
@@ -132,7 +121,7 @@ const COIN_COLORS = [
     'bg-emerald-600', 'bg-orange-500', 'bg-pink-600',
 ];
 
-function CoinCard({ coin, index, token, onDeleted }) {
+function CoinCard({ coin, index, token, onEdited, onDeleted }) {
     const bg         = COIN_COLORS[index % COIN_COLORS.length];
     const [confirming, setConfirming] = useState(false);
 
@@ -148,62 +137,45 @@ function CoinCard({ coin, index, token, onDeleted }) {
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-            {/* Coloured top */}
             <div className={`${bg} flex flex-col items-center justify-center py-7 gap-1`}>
                 <span className="text-4xl">🪙</span>
-                <span className="text-white font-bold text-sm mt-1 tracking-wide uppercase">
-                    {coin.name}
-                </span>
+                <span className="text-white font-bold text-sm mt-1 tracking-wide uppercase">{coin.name}</span>
             </div>
 
             <div className="p-5">
                 <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                         <span className="text-gray-500">Price:</span>
-                        <span className="font-bold text-gray-800 text-base">
-                            LKR {parseFloat(coin.price).toFixed(2)}
-                        </span>
+                        <span className="font-bold text-gray-800 text-base">LKR {parseFloat(coin.price).toFixed(2)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                         <span className="text-gray-500">Added:</span>
-                        <span className="text-gray-700 font-medium">
-                            {new Date(coin.created_at).toLocaleDateString()}
-                        </span>
+                        <span className="text-gray-700 font-medium">{new Date(coin.created_at).toLocaleDateString()}</span>
                     </div>
                 </div>
             </div>
 
-            {/* Footer */}
             <div className="bg-gray-900 flex items-center justify-center py-3 gap-4">
                 {confirming ? (
                     <>
                         <span className="text-xs text-gray-300">Delete?</span>
-                        <button
-                            onClick={handleDelete}
-                            className="text-red-400 hover:text-red-300 text-xs font-semibold transition"
-                        >
-                            Yes
-                        </button>
-                        <button
-                            onClick={() => setConfirming(false)}
-                            className="text-gray-400 hover:text-white text-xs transition"
-                        >
-                            No
-                        </button>
+                        <button onClick={handleDelete} className="text-red-400 hover:text-red-300 text-xs font-semibold transition">Yes</button>
+                        <button onClick={() => setConfirming(false)} className="text-gray-400 hover:text-white text-xs transition">No</button>
                     </>
                 ) : (
-                    <button
-                        onClick={() => setConfirming(true)}
-                        className="text-gray-400 hover:text-white transition"
-                        title="Delete coin"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                    </button>
+                    <>
+                        <button onClick={() => onEdited(coin)} className="text-gray-400 hover:text-white transition" title="Edit coin">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <div className="w-px h-4 bg-gray-700"></div>
+                        <button onClick={() => setConfirming(true)} className="text-gray-400 hover:text-red-400 transition" title="Delete coin">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </>
                 )}
             </div>
         </div>
@@ -214,10 +186,11 @@ function CoinCard({ coin, index, token, onDeleted }) {
 export default function Coins() {
     const { token }                 = useAuth();
     const navigate                  = useNavigate();
-    const [coins,     setCoins]     = useState([]);
-    const [loading,   setLoading]   = useState(true);
-    const [search,    setSearch]    = useState('');
-    const [showModal, setShowModal] = useState(false);
+    const [coins,       setCoins]       = useState([]);
+    const [loading,     setLoading]     = useState(true);
+    const [search,      setSearch]      = useState('');
+    const [showModal,   setShowModal]   = useState(false);
+    const [editingCoin, setEditingCoin] = useState(null);
 
     useEffect(() => {
         if (!token) return;
@@ -238,6 +211,7 @@ export default function Coins() {
     }, [token]);
 
     const handleSaved   = (coin) => setCoins(prev => [coin, ...prev]);
+    const handleUpdated = (coin) => setCoins(prev => prev.map(c => c.id === coin.id ? coin : c));
     const handleDeleted = (id)   => setCoins(prev => prev.filter(c => c.id !== id));
 
     const filtered = coins.filter(c =>
@@ -313,6 +287,7 @@ export default function Coins() {
                                 coin={c}
                                 index={i}
                                 token={token}
+                                onEdited={setEditingCoin}
                                 onDeleted={handleDeleted}
                             />
                         ))}
@@ -320,11 +295,12 @@ export default function Coins() {
                 )}
             </main>
 
-            {showModal && (
-                <AddCoinModal
+            {(showModal || editingCoin) && (
+                <CoinModal
                     token={token}
-                    onClose={() => setShowModal(false)}
-                    onSaved={handleSaved}
+                    coin={editingCoin}
+                    onClose={() => { setShowModal(false); setEditingCoin(null); }}
+                    onSaved={editingCoin ? handleUpdated : handleSaved}
                 />
             )}
         </div>

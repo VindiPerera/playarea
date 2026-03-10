@@ -24,6 +24,18 @@ class CoinController extends Controller
         return response()->json($coin, 201);
     }
 
+    public function update(Request $request, Coin $coin)
+    {
+        $validated = $request->validate([
+            'name'  => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+        ]);
+
+        $coin->update($validated);
+
+        return response()->json($coin);
+    }
+
     public function destroy(Coin $coin)
     {
         $coin->delete();
