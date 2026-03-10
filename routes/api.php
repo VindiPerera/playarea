@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Customers
     Route::get('/customers',               [CustomerController::class, 'index']);
     Route::post('/customers',              [CustomerController::class, 'store']);
+    Route::put('/customers/{customer}',    [CustomerController::class, 'update']);
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
 
     // Games
@@ -32,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Coins
     Route::get('/coins',            [CoinController::class, 'index']);
     Route::post('/coins',           [CoinController::class, 'store']);
+    Route::put('/coins/{coin}',     [CoinController::class, 'update']);
     Route::delete('/coins/{coin}',  [CoinController::class, 'destroy']);
 
     // Settings
